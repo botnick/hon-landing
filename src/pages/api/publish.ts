@@ -54,12 +54,38 @@ function isSafeText(v: unknown, min: number, max: number): boolean {
   return !UNSAFE_TEXT.test(v);
 }
 
-/** Reject overly-deep JSON (a serialize/render DoS vector). */
-function tooDeep(v: unknown, depth = 0): boolean {
-  if (depth > MAX_JSON_DEPTH) return true;
-  if (Array.isArray(v)) return v.some((x) => tooDeep(x, depth + 1));
-  if (v && typeof v === 'object') return Object.values(v).some((x) => tooDeep(x, depth + 1));
-  return false;
+const MAX_NODES = 4000;                // breadth cap: total values across the tree
+const MAX_ARRAY_LEN = 200;             // no single array may exceed this
+// Any string that STARTS with a dangerous URI scheme (after trimming leading
+// whitespace/control chars). Blocks javascript:/data:/vbscript: in href/src fields —
+// which an angle-bracket filter alone does NOT stop.
+const DANGEROUS_URI = /^[\u0000-\u0020]*(?:javascript|data|vbscript)\s*:/i;
+
+/**
+ * One recursive pass over the snapshot that enforces the render-safety budget:
+ *  - depth ≤ MAX_JSON_DEPTH (deep-nesting DoS)
+ *  - total node count ≤ MAX_NODES and every array ≤ MAX_ARRAY_LEN (breadth DoS)
+ *  - no string value uses a dangerous URI scheme (javascript:/data:/vbscript:),
+ *    since URL-context fields (href/src) bypass the angle-bracket text filter.
+ * Returns an error string, or null when the whole tree is safe.
+ */
+function scanTree(v: unknown, depth: number, count: { n: number }): string | null {
+  if (depth > MAX_JSON_DEPTH) return 'nesting too deep';
+  if (++count.n > MAX_NODES) return 'too many nodes';
+  if (typeof v === 'string') {
+    if (DANGEROUS_URI.test(v)) return 'dangerous URI scheme';
+    return null;
+  }
+  if (Array.isArray(v)) {
+    if (v.length > MAX_ARRAY_LEN) return 'array too long';
+    for (const x of v) { const e = scanTree(x, depth + 1, count); if (e) return e; }
+    return null;
+  }
+  if (v && typeof v === 'object') {
+    for (const x of Object.values(v)) { const e = scanTree(x, depth + 1, count); if (e) return e; }
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -69,7 +95,8 @@ function tooDeep(v: unknown, depth = 0): boolean {
  */
 function validateSnapshot(s: unknown): string | null {
   if (typeof s !== 'object' || s === null || Array.isArray(s)) return 'not an object';
-  if (tooDeep(s)) return 'nesting too deep';
+  const treeError = scanTree(s, 0, { n: 0 });
+  if (treeError) return treeError;
   const o = s as Record<string, unknown>;
 
   const brand = o.brand as Record<string, unknown> | undefined;
