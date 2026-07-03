@@ -1,0 +1,163 @@
+---
+import { getMember, getSocial, fallbackContent } from '../lib/content';
+
+const { content = fallbackContent } = Astro.props;
+const m = getMember(content);
+const social = getSocial(content);
+
+// Account portal not wired yet → login/register stay sealed and Discord is the
+// door. (The portal hand-off after the cooldown is handled by the view router.)
+const hasPortal = Boolean(m.loginUrl || m.registerUrl);
+---
+<div class="mb">
+  <!-- Page head band -->
+  <section class="mb-head" id="member">
+    <div class="mb-head-bg" aria-hidden="true">
+      <picture>
+        <source srcset="/art/stone-wall.avif" type="image/avif" />
+        <source srcset="/art/stone-wall.webp" type="image/webp" />
+        <img src="/art/stone-wall.webp" alt="" decoding="async" loading="lazy" />
+      </picture>
+      <div class="mb-head-fade"></div>
+    </div>
+    <div class="wrap mb-head-inner">
+      <p class="act-eyebrow">{m.eyebrow}</p>
+      <h1 class="mb-title">{m.title}</h1>
+      <p class="mb-subtitle">{m.subtitle}</p>
+
+      <div class="mb-auth">
+        {hasPortal ? (
+          <>
+            {m.loginUrl && <a class="btn-auth btn-auth--primary" href={m.loginUrl}>{m.loginLabel}</a>}
+            {m.registerUrl && <a class="btn-auth" href={m.registerUrl}>{m.registerLabel}</a>}
+          </>
+        ) : (
+          <div class="mb-sealed">
+            <p class="mb-sealed-note">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <rect x="5" y="11" width="14" height="9" rx="1" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              {m.comingSoonNote}
+            </p>
+            <a class="btn-auth btn-auth--primary" href={social.discord} target="_blank" rel="noopener">
+              {m.discordButtonLabel}
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- What lives in the garrison — numbered feature plates -->
+  <section class="mb-features">
+    <div class="wrap mb-features-inner">
+      <div class="features" data-stagger>
+        {m.features.map((f) => (
+          <article class="feature r-item">
+            <header class="feature-head">
+              <span class="feature-no" aria-hidden="true">{f.no}</span>
+              <span class="feature-status">{f.status}</span>
+            </header>
+            <h2 class="feature-title">{f.title}</h2>
+            <p class="feature-body">{f.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+</div>
+
+<style>
+  /* --- Head band (same family as the download view) --- */
+  .mb-head {
+    position: relative; isolation: isolate; overflow: hidden;
+    padding-block: clamp(7rem, 20vh, 11rem) clamp(3rem, 8vh, 5rem);
+  }
+  .mb-head-bg { position: absolute; inset: 0; z-index: -1; }
+  .mb-head-bg img {
+    width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%;
+    opacity: 0.4; filter: saturate(0.9) brightness(0.75);
+  }
+  .mb-head-fade {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, rgba(5,7,10,0.7) 0%, transparent 40%, var(--ink) 96%),
+      radial-gradient(55% 45% at 50% 20%, rgba(255,198,0,0.07), transparent 70%);
+  }
+  .mb-head-inner { max-width: 1000px; margin-inline: auto; }
+  .mb-title { font-size: var(--fs-h2); line-height: var(--lh-head); color: var(--text); }
+  .mb-subtitle { margin-top: 0.9rem; color: var(--text-dim); font-size: var(--fs-lead); line-height: var(--lh-body); max-width: 52ch; }
+
+  /* --- Auth block --- */
+  .mb-auth { margin-top: clamp(1.8rem, 4vh, 2.6rem); }
+  .mb-sealed {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1.1rem;
+    background: var(--plate);
+    border: 1px solid var(--brass);
+    box-shadow: var(--hairline-inset);
+    padding: clamp(1.3rem, 3.5vw, 1.9rem);
+    max-width: 640px;
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+  }
+  .mb-sealed-note {
+    display: flex; align-items: flex-start; gap: 0.7rem;
+    color: var(--text-dim); font-size: var(--fs-body); line-height: var(--lh-body);
+  }
+  .mb-sealed-note svg { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 0.2rem; color: var(--gold-deep); }
+
+  .btn-auth {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    font-family: var(--font-display); font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.95rem;
+    padding: 0.9rem 2rem;
+    color: var(--gold-bright);
+    background: rgba(0,0,0,0.35);
+    border: var(--edge-gold);
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+    transition: transform var(--dur-fast) var(--ease-out), filter var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+  }
+  .btn-auth:hover { transform: translateY(-2px); background: rgba(255,198,0,0.1); box-shadow: var(--glow-gold); }
+  .btn-auth--primary {
+    color: #1a1206;
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
+    border: 1px solid rgba(255,224,138,0.8);
+  }
+  .btn-auth--primary:hover { background: linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep)); filter: brightness(1.08); box-shadow: 0 0 38px rgba(255,198,0,0.55); }
+
+  /* --- Feature plates --- */
+  .mb-features { padding-block: clamp(2rem, 6vh, 4rem); }
+  .mb-features-inner { max-width: 1000px; margin-inline: auto; }
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(0.9rem, 2vw, 1.4rem); }
+  .feature {
+    background: var(--plate-2);
+    border: 1px solid var(--brass-soft);
+    box-shadow: var(--hairline-inset);
+    padding: clamp(1.3rem, 3vw, 1.8rem);
+    transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .feature:hover { border-color: var(--brass-strong); background: rgba(191,151,73,0.05); transform: translateY(-3px); }
+    .feature:hover .feature-no { color: var(--gold); }
+  }
+  .feature-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .feature-no {
+    font-family: var(--font-latin); font-weight: 700;
+    font-size: clamp(1.5rem, 3.4vw, 2rem); line-height: 1;
+    color: var(--gold-deep); font-variant-numeric: tabular-nums;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .feature-status {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 0.72rem; letter-spacing: 0.1em;
+    color: var(--text-dim);
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--brass-soft);
+    background: rgba(191,151,73,0.05);
+  }
+  .feature-title { font-size: var(--fs-body); font-weight: 700; color: var(--text); line-height: var(--lh-head); }
+  .feature-body { margin-top: 0.5rem; color: var(--text-dim); font-size: var(--fs-small); line-height: var(--lh-body); }
+
+  @media (max-width: 760px) {
+    .features { grid-template-columns: 1fr; }
+  }
+</style>

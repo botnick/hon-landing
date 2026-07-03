@@ -1,0 +1,50 @@
+---
+import Factions from './Factions.astro';
+import VideoSpotlight from './VideoSpotlight.astro';
+import { getWar, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const w = getWar(content);
+---
+<!-- Act 3 — The War. One section, one head, two beats: choose your side
+     (factions) then see the battlefield (reel). Each beat gets a small brass
+     sub-label so it has identity without a competing subtitle line. -->
+<section class="war" id="war">
+  <header class="act-head wrap">
+    <p class="act-eyebrow">{w.eyebrow}</p>
+    <h2 class="act-title">{w.title}</h2>
+    {w.subtitle && <p class="act-sub">{w.subtitle}</p>}
+  </header>
+
+  <div class="war-beat" data-stagger>
+    {w.factionsLabel && <p class="beat-label wrap r-item"><span>{w.factionsLabel}</span></p>}
+    <div class="r-item"><Factions content={content} /></div>
+  </div>
+
+  <div class="war-beat war-beat--reel" data-stagger>
+    {w.spotlightLabel && <p class="beat-label wrap r-item"><span>{w.spotlightLabel}</span></p>}
+    <div class="r-item"><VideoSpotlight content={content} /></div>
+  </div>
+</section>
+
+<style>
+  .war { padding-block: var(--section-pad); position: relative; }
+  .war-beat { margin-top: clamp(2.6rem, 6vh, 4.2rem); }
+  .war-beat:first-of-type { margin-top: clamp(2rem, 5vh, 3.2rem); }
+
+  /* Beat label — a centered brass rule with a small caps tag riding it. Gives
+     each beat a title without stacking full subtitle sentences. */
+  .beat-label {
+    display: flex; align-items: center; gap: 1rem;
+    justify-content: center;
+    margin: 0 auto clamp(1.4rem, 3.2vh, 2.2rem);
+    color: var(--gold-bright);
+    font-family: var(--font-display); font-weight: 700;
+    font-size: var(--fs-small); letter-spacing: 0.16em;
+  }
+  .beat-label::before, .beat-label::after {
+    content: ''; height: 1px; width: clamp(28px, 12vw, 90px);
+    background: linear-gradient(90deg, transparent, var(--brass));
+  }
+  .beat-label::after { background: linear-gradient(90deg, var(--brass), transparent); }
+  .beat-label span { white-space: nowrap; }
+</style>

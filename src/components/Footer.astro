@@ -1,0 +1,136 @@
+---
+import { getFactions, getSocial, getContent, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const site = getContent(content);
+const f = getFactions(content);
+const social = getSocial(content);
+const year = 2026; // build-time constant; no Date() in SSR-cached output
+---
+<footer class="ft" id="site-footer">
+  <!-- Stone rampart backdrop (atelier-gen, HoN dungeon wall) -->
+  <div class="ft-wall" aria-hidden="true">
+    <picture>
+      <source srcset="/art/stone-wall.avif" type="image/avif" />
+      <source srcset="/art/stone-wall.webp" type="image/webp" />
+      <img src="/art/stone-wall.webp" alt="" loading="lazy" decoding="async" />
+    </picture>
+    <div class="ft-wall-fade"></div>
+  </div>
+
+  <!-- Ornamental heraldic rail -->
+  <div class="ft-rail" aria-hidden="true"></div>
+
+  <!-- Three crests: Legion · HoN · Hellbourne (like the original portal) -->
+  <div class="ft-crests">
+    <div class="ft-crest ft-crest--legion">
+      <img src={f.legion.crest} alt={`ตรา ${f.legion.name}`} width="96" height="96" loading="lazy" />
+      <span class="ft-crest-name" style={`color:${f.legion.accent}`}>{f.legion.name}</span>
+    </div>
+
+    <a class="ft-emblem" href="#top" aria-label={`${site.brand.name} — กลับขึ้นด้านบน`}>
+      <picture>
+        <source srcset={site.brand.logoWebp} type="image/webp" />
+        <img src={site.brand.logo} alt={site.brand.name} width="150" height="80" loading="lazy" />
+      </picture>
+    </a>
+
+    <div class="ft-crest ft-crest--hellbourne">
+      <img src={f.hellbourne.crest} alt={`ตรา ${f.hellbourne.name}`} width="96" height="96" loading="lazy" />
+      <span class="ft-crest-name" style={`color:${f.hellbourne.accent}`}>{f.hellbourne.name}</span>
+    </div>
+  </div>
+
+  <div class="ft-base">
+    {social.discord && (
+      <a class="ft-social" href={social.discord} target="_blank" rel="noopener">
+        <svg class="ft-social-logo" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.6 12.6 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.2 14.2 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.1 13.1 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.3 12.3 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.84 19.84 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028M8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419c0-1.333.955-2.42 2.157-2.42c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.419-2.157 2.419m7.975 0c-1.183 0-2.157-1.086-2.157-2.419c0-1.333.955-2.42 2.157-2.42c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.419-2.157 2.419"/>
+        </svg>Discord
+      </a>
+    )}
+    <p class="ft-copy">© {year} {site.brand.name} · Heroes of Newerth</p>
+  </div>
+</footer>
+
+<style>
+  .ft {
+    position: relative;
+    margin-top: clamp(3rem, 8vh, 6rem);
+    padding-block: clamp(2.5rem, 6vh, 4rem) 1.6rem;
+    overflow: hidden;
+    isolation: isolate;
+    border-top: 1px solid rgba(255,198,0,0.14);
+  }
+
+  /* --- Stone wall backdrop --- */
+  .ft-wall { position: absolute; inset: 0; z-index: -2; }
+  .ft-wall img {
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: 50% 40%;
+    opacity: 0.55;
+    filter: saturate(0.9) brightness(0.8);
+  }
+  .ft-wall-fade {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, var(--ink) 0%, transparent 22%, transparent 60%, rgba(5,7,10,0.85) 100%),
+      radial-gradient(60% 50% at 50% 40%, rgba(255,198,0,0.06), transparent 70%);
+  }
+
+  /* --- Heraldic rail (thin engraved metal line) --- */
+  .ft-rail {
+    height: 3px; width: min(1100px, 92vw); margin: 0 auto clamp(2rem, 5vh, 3rem);
+    background: linear-gradient(90deg,
+      transparent, rgba(255,198,0,0.15) 12%, rgba(255,198,0,0.55) 50%, rgba(255,198,0,0.15) 88%, transparent);
+    box-shadow: 0 0 12px rgba(255,198,0,0.25);
+  }
+
+  /* --- Crests row --- */
+  .ft-crests {
+    display: flex; align-items: center; justify-content: center;
+    gap: clamp(1.6rem, 6vw, 5rem);
+    max-width: min(1100px, 92vw); margin: 0 auto;
+  }
+  .ft-crest { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+  .ft-crest img {
+    width: clamp(60px, 9vw, 92px); height: auto; object-fit: contain;
+    transition: transform var(--dur) var(--ease-out), filter var(--dur) var(--ease-out);
+  }
+  .ft-crest--legion img { filter: drop-shadow(0 0 14px rgba(64,205,60,0.4)); }
+  .ft-crest--hellbourne img { filter: drop-shadow(0 0 14px rgba(220,0,0,0.4)); }
+  .ft-crest:hover img { transform: translateY(-4px) scale(1.06); }
+  .ft-crest-name {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(0.75rem, 1.8vw, 0.95rem); letter-spacing: 0.14em; text-transform: uppercase;
+  }
+
+  .ft-emblem {
+    display: grid; place-items: center;
+    filter: drop-shadow(0 4px 18px rgba(0,0,0,0.7));
+    transition: transform var(--dur) var(--ease-out);
+  }
+  .ft-emblem img { width: clamp(96px, 15vw, 150px); height: auto; }
+  .ft-emblem:hover { transform: scale(1.05); }
+
+  /* --- Base row --- */
+  .ft-base {
+    display: flex; flex-direction: column; align-items: center; gap: 0.8rem;
+    margin-top: clamp(2rem, 5vh, 3rem); text-align: center;
+  }
+  .ft-social {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: var(--font-display); font-weight: 600; letter-spacing: 0.06em;
+    color: var(--emerald-bright); text-shadow: var(--glow-emerald);
+    padding: 0.5rem 1.1rem; border: 1px solid rgba(64,205,60,0.35);
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    transition: transform var(--dur-fast), background var(--dur-fast), color var(--dur-fast);
+  }
+  .ft-social:hover { transform: translateY(-2px); background: rgba(88,101,242,0.14); color: #fff; border-color: rgba(88,101,242,0.6); }
+  .ft-social-logo { width: 18px; height: 18px; flex: 0 0 auto; }
+  .ft-copy { font-size: 0.8rem; color: var(--text-dim); opacity: 0.75; letter-spacing: 0.02em; }
+
+  @media (max-width: 560px) {
+    .ft-crests { gap: 1rem; }
+    .ft-crest-name { letter-spacing: 0.08em; }
+  }
+</style>

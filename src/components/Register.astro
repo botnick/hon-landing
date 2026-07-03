@@ -1,0 +1,82 @@
+---
+import { getRegister, getSocial, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const r = getRegister(content);
+const social = getSocial(content);
+---
+<section class="rg" id="register">
+  <div class="rg-glow" aria-hidden="true"></div>
+  <div class="wrap rg-inner">
+    <p class="act-eyebrow">{r.eyebrow}</p>
+    <h2 class="rg-title">{r.title}</h2>
+    <p class="rg-sub">{r.subtitle}</p>
+
+    {social.discord && (
+      <a class="rg-discord-btn" href={social.discord} target="_blank" rel="noopener">
+        <svg class="rg-discord-logo" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.6 12.6 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.2 14.2 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.1 13.1 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.3 12.3 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.84 19.84 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028M8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419c0-1.333.955-2.42 2.157-2.42c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.419-2.157 2.419m7.975 0c-1.183 0-2.157-1.086-2.157-2.419c0-1.333.955-2.42 2.157-2.42c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.419-2.157 2.419"/>
+        </svg>
+        <span class="rg-discord-label">{r.buttonLabel}</span>
+        <span class="rg-discord-shine" aria-hidden="true"></span>
+      </a>
+    )}
+
+    <p class="rg-note">{r.note}</p>
+  </div>
+</section>
+
+<style>
+  .rg { position: relative; padding-block: var(--section-pad); text-align: center; overflow: hidden; isolation: isolate; }
+  /* Subtle brass floor only — the CTA carries the light, not the background. */
+  .rg-glow {
+    position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(60% 45% at 50% 118%, rgba(191,151,73,0.06), transparent 62%);
+  }
+  .rg-inner { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
+  .rg-title {
+    font-size: var(--fs-h2); line-height: var(--lh-head);
+    color: var(--text); letter-spacing: 0.01em;   /* ivory, flat — restraint */
+  }
+  .rg-sub { color: var(--text-dim); font-size: var(--fs-lead); max-width: 48ch; line-height: var(--lh-body); }
+
+  /* --- Primary CTA: big, bold Discord button (the site's main action) --- */
+  .rg-discord-btn {
+    position: relative; isolation: isolate; overflow: hidden;
+    margin-top: 1.8rem;
+    display: inline-flex; align-items: center; gap: 0.85rem;
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.15rem, 3vw, 1.5rem); letter-spacing: 0.01em;
+    color: #fff;
+    padding: clamp(1.05rem, 2.6vw, 1.5rem) clamp(2rem, 5vw, 3.2rem);
+    background: linear-gradient(180deg, #5865F2, #4752c4);
+    border: 1px solid rgba(255,255,255,0.22);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.4),
+      0 10px 30px -6px rgba(88,101,242,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.35);
+    clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast), filter var(--dur-fast);
+  }
+  .rg-discord-btn:hover {
+    transform: translateY(-3px) scale(1.02);
+    filter: brightness(1.08);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.4),
+      0 16px 44px -6px rgba(88,101,242,0.8),
+      0 0 30px rgba(88,101,242,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.45);
+  }
+  .rg-discord-btn:active { transform: translateY(-1px) scale(0.99); }
+  .rg-discord-logo { width: clamp(26px, 5vw, 34px); height: auto; flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+  .rg-discord-label { position: relative; z-index: 1; }
+  /* sweep of light on hover */
+  .rg-discord-shine {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.35) 48%, transparent 62%);
+    transform: translateX(-120%);
+  }
+  .rg-discord-btn:hover .rg-discord-shine { animation: rgSheen 0.8s var(--ease-out); }
+  @keyframes rgSheen { to { transform: translateX(120%); } }
+
+  .rg-note { font-size: 0.85rem; color: var(--text-dim); opacity: 0.85; margin-top: 0.9rem; max-width: 40ch; }
+</style>

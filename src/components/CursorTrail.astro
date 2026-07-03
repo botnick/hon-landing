@@ -1,0 +1,165 @@
+---
+// Mystical WebGL fluid cursor trail (gold+emerald). OFF by default; a small
+// floating toggle turns it on/off and remembers the choice. Guards: skipped for
+// reduced-motion and coarse-pointer (touch) devices, where a cursor trail makes
+// no sense and just drains battery. The heavy WebGL sim lazy-inits only on enable.
+---
+<!-- Full-screen sim canvas (the script paints into this). Hidden until enabled. -->
+<canvas id="fluid" aria-hidden="true"></canvas>
+
+<!-- Toggle: icon-only diamond. State reads from the icon itself (dim=off, glowing
+     gold+spin=on). Tooltip (title) + aria-label carry the meaning without on-screen
+     text. Hidden on touch/reduced-motion. -->
+<button id="trail-toggle" type="button" class="trail-toggle" aria-pressed="false"
+        title="เอฟเฟกต์เมาส์" aria-label="เปิด/ปิด เอฟเฟกต์เมาส์">
+  <span class="trail-glyph" aria-hidden="true">✦</span>
+</button>
+
+<script is:inline src="/js/cursor-trail.js" defer></script>
+
+<script is:inline>
+  (function () {
+    var KEY = 'honx-cursor-trail';
+    var toggle = document.getElementById('trail-toggle');
+    var canvas = document.getElementById('fluid');
+    if (!toggle || !canvas) return;
+
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var coarse = window.matchMedia('(pointer: coarse)').matches; // touch → no cursor
+    var noWebGL = (function () {
+      try { var c = document.createElement('canvas'); return !(c.getContext('webgl2') || c.getContext('webgl')); }
+      catch (e) { return true; }
+    })();
+
+    // On unsupported/undesirable contexts, remove the UI entirely.
+    if (reduce || coarse || noWebGL) {
+      toggle.remove();
+      canvas.remove();
+      return;
+    }
+
+    function apply(on) {
+      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+      toggle.classList.toggle('is-on', on);
+      // icon-only: state is conveyed by the glyph styling + tooltip
+      toggle.title = on ? 'เอฟเฟกต์เมาส์ · เปิดอยู่' : 'เอฟเฟกต์เมาส์ · คลิกเพื่อเปิด';
+      // window.CursorTrail is defined by cursor-trail.js; it may load slightly after
+      // this inline script, so poll briefly until it's ready.
+      function drive() {
+        if (window.CursorTrail) { on ? window.CursorTrail.enable() : window.CursorTrail.disable(); }
+        else { setTimeout(drive, 50); }
+      }
+      drive();
+    }
+
+    // Default OFF. Only enable if the user previously turned it on.
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    var on = saved === 'on';
+    apply(on);
+
+    toggle.addEventListener('click', function () {
+      on = !on;
+      try { localStorage.setItem(KEY, on ? 'on' : 'off'); } catch (e) {}
+      apply(on);
+    });
+
+    // Scroll-gate the trail to the HERO zone (grok): full over the dark artwork,
+    // fades out over text/proof sections so it never hurts readability. The sim
+    // keeps running (cheap when static); we just fade the canvas opacity.
+    var hero = document.getElementById('top');
+    if (hero) {
+      canvas.style.transition = 'opacity .4s ease';
+      var ticking = false;
+      var gate = function () {
+        ticking = false;
+        // 1 while within the hero, ramping to 0 by the time it's one viewport gone.
+        var end = hero.offsetTop + hero.offsetHeight;
+        var fadeOver = window.innerHeight * 0.6;
+        var past = window.scrollY - (end - fadeOver);
+        var o = past <= 0 ? 1 : Math.max(0, 1 - past / fadeOver);
+        canvas.style.opacity = o.toFixed(2);
+      };
+      window.addEventListener('scroll', function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(gate); }
+      }, { passive: true });
+      gate();
+    }
+  })();
+</script>
+
+<style is:global>
+  /* The sim canvas — fixed, full-viewport, never intercepts clicks.
+     screen blend + slight brightness/saturate makes the trail read as GLOWING
+     magic energy (additive-like bloom) rather than a flat coloured line (grok). */
+  #fluid {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    mix-blend-mode: screen;
+    filter: brightness(1.15) saturate(1.15) contrast(1.05);
+    pointer-events: none;
+    visibility: hidden;   /* the script toggles this */
+    z-index: 60;          /* above content, below the toggle + grain */
+  }
+
+  /* Toggle — a clean icon-only brass diamond, bottom-right. No on-screen text
+     (user preference); the ICON conveys state: dim when off (with a couple of
+     intro pulses), glowing gold + slow spin when on. Meaning lives in the tooltip. */
+  .trail-toggle {
+    position: fixed; right: clamp(0.9rem, 3vw, 1.6rem); bottom: clamp(0.9rem, 3vw, 1.6rem);
+    z-index: 70;
+    display: grid; place-items: center;
+    width: 44px; height: 44px; padding: 0;
+    background: transparent; border: 0;
+    transition: transform .18s var(--ease-out, ease);
+  }
+  .trail-toggle:hover { transform: scale(1.1); }
+  .trail-toggle:active { transform: scale(0.92); }
+  .trail-toggle:focus-visible { outline: 2px solid var(--gold, #ffc600); outline-offset: 4px; }
+
+  /* The diamond glyph is the whole button. Brass ring, dim gold glyph when OFF. */
+  .trail-glyph {
+    display: grid; place-items: center;
+    width: 38px; height: 38px;
+    font-size: 1.05rem; line-height: 1;
+    color: var(--text-dim, #a99f88);
+    background: rgba(5, 7, 10, 0.55);
+    border: 1px solid var(--brass, rgba(191,151,73,0.42));
+    backdrop-filter: blur(5px);
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    box-shadow: 0 4px 14px -4px rgba(0,0,0,0.6);
+    transition: color .25s ease, text-shadow .25s ease, box-shadow .25s ease, border-color .25s ease;
+    /* A few intro glows right after load to hint it's clickable, then settle. */
+    animation: trailPulse 1.6s ease-in-out 0.7s 3 both;
+  }
+  .trail-toggle:hover .trail-glyph {
+    color: var(--gold-bright, #ffe08a);
+    text-shadow: 0 0 10px rgba(255,198,0,0.85);
+    animation: trailSpark 0.5s ease-out;
+  }
+
+  /* --- ON state — the diamond lights up gold and slowly spins --- */
+  .trail-toggle.is-on { animation: none; }   /* stop the intro pulse once on */
+  .trail-toggle.is-on .trail-glyph {
+    color: var(--gold-bright, #ffe08a);
+    border-color: rgba(255,198,0,0.7);
+    text-shadow: 0 0 12px rgba(255, 198, 0, 0.9);
+    box-shadow: 0 0 18px rgba(255,198,0,0.4), inset 0 0 10px rgba(255,198,0,0.22);
+    animation: trailSpin 9s linear infinite;
+  }
+
+  @keyframes trailPulse {
+    0%, 100% { box-shadow: 0 4px 14px -4px rgba(0,0,0,0.6); border-color: var(--brass, rgba(191,151,73,0.42)); }
+    50%      { box-shadow: 0 0 20px rgba(255,198,0,0.3), 0 4px 14px -4px rgba(0,0,0,0.6); border-color: rgba(255,198,0,0.55); }
+  }
+  @keyframes trailSpin { to { transform: rotate(360deg); } }
+  @keyframes trailSpark {
+    0%   { transform: scale(1) rotate(0deg); }
+    50%  { transform: scale(1.18) rotate(8deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .trail-toggle, .trail-toggle.is-on .trail-glyph { animation: none; transition: none; }
+  }
+</style>

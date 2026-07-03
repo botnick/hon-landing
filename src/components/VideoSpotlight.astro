@@ -1,0 +1,216 @@
+---
+import { getMedia, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const m = getMedia(content);
+const reel = (m as any).reel;
+const scenes = m.scenes ?? [];
+---
+<!-- Inner partial of the War Reel (Act 3): the cinematic reel under the factions.
+     Its label ('ชมสนามรบ') is the WarReel beat-label — no own subtitle here.
+     If a self-hosted highlight reel is configured, play it; else fall back to the
+     crossfading scene slideshow. -->
+<div class="sp">
+  {reel ? (
+    <div class="sp-stage sp-stage--reel">
+      <video
+        class="sp-video"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="none"
+        poster={`${reel.poster}.webp`}
+        aria-label={reel.heading}
+      >
+        <source src={reel.webm} type="video/webm" />
+        <source src={reel.mp4} type="video/mp4" />
+      </video>
+      <div class="sp-scrim" aria-hidden="true"></div>
+      <figcaption class="sp-cap sp-cap--static">
+        <span class="sp-chip">{m.label}</span>
+        <span class="sp-heading">{reel.heading}</span>
+        <span class="sp-caption">{reel.caption}</span>
+      </figcaption>
+    </div>
+  ) : (
+    <div
+      class="sp-stage"
+      data-autoplay={m.autoplayMs ?? 5000}
+      aria-roledescription="carousel"
+      aria-label={m.title}
+    >
+      <div class="sp-frames">
+        {scenes.map((s, i) => (
+          <figure class={`sp-frame${i === 0 ? ' is-active' : ''}`} data-i={i}>
+            <picture>
+              <source srcset={`${s.image}.avif`} type="image/avif" />
+              <source srcset={`${s.image}.webp`} type="image/webp" />
+              <img class="sp-img" src={`${s.image}.png`} alt={s.caption} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" width="1536" height="1024" />
+            </picture>
+            <div class="sp-scrim" aria-hidden="true"></div>
+            <figcaption class="sp-cap">
+              <span class="sp-chip">{m.label}</span>
+              <span class="sp-heading">{s.heading}</span>
+              <span class="sp-caption">{s.caption}</span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+
+      {scenes.length > 1 && (
+        <div class="sp-dots" role="tablist" aria-label="เลือกฉาก">
+          {scenes.map((_, i) => (
+            <button class={`sp-dot${i === 0 ? ' is-active' : ''}`} data-dot={i} type="button" role="tab" aria-label={`ฉากที่ ${i + 1}`} aria-selected={i === 0 ? 'true' : 'false'}></button>
+          ))}
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
+<script>
+  // Slideshow logic — only runs when the scene carousel is present (no reel).
+  const stage = document.querySelector<HTMLElement>('.sp-stage:not(.sp-stage--reel)');
+  if (stage) {
+    const frames = Array.from(stage.querySelectorAll<HTMLElement>('.sp-frame'));
+    const dots = Array.from(stage.querySelectorAll<HTMLButtonElement>('.sp-dot'));
+    const interval = Number(stage.dataset.autoplay) || 5000;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let cur = 0;
+    let timer: number | undefined;
+    let inView = false;
+
+    function show(n: number) {
+      cur = (n + frames.length) % frames.length;
+      frames.forEach((f, i) => f.classList.toggle('is-active', i === cur));
+      dots.forEach((d, i) => {
+        d.classList.toggle('is-active', i === cur);
+        d.setAttribute('aria-selected', i === cur ? 'true' : 'false');
+      });
+    }
+    function next() { show(cur + 1); }
+    function play() {
+      if (timer || reduce || frames.length < 2) return;
+      timer = window.setInterval(() => { if (inView) next(); }, interval);
+    }
+    function stop() { if (timer) { window.clearInterval(timer); timer = undefined; } }
+
+    dots.forEach((d) =>
+      d.addEventListener('click', () => { show(Number(d.dataset.dot)); stop(); play(); })
+    );
+
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { inView = e.isIntersecting; }),
+      { threshold: 0.25 }
+    );
+    io.observe(stage);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else play(); });
+    play();
+  }
+
+  // Reel: lazy-load + play only while on screen (saves data + battery, stays smooth).
+  const reelStage = document.querySelector<HTMLElement>('.sp-stage--reel');
+  const video = reelStage?.querySelector<HTMLVideoElement>('.sp-video');
+  if (reelStage && video) {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let loaded = false;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          if (!loaded) { video.load(); loaded = true; }
+          if (!reduce) video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      });
+    }, { threshold: 0.25 });
+    io.observe(reelStage);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) video.pause(); });
+  }
+</script>
+
+<style>
+  /* Inner partial: WarReel handles the spacing + label above it. */
+  .sp { padding: 0; }
+
+  .sp-stage {
+    position: relative;
+    width: min(1240px, 96vw); margin-inline: auto;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid var(--brass);
+    box-shadow: var(--shadow-deep);
+    background: #05070a;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%);
+    contain: layout paint;
+  }
+  .sp-frames { position: absolute; inset: 0; }
+
+  /* --- Self-hosted highlight reel --- */
+  .sp-video {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    filter: saturate(1.05) contrast(1.03);
+  }
+
+  .sp-frame {
+    position: absolute; inset: 0; margin: 0;
+    opacity: 0;
+    transition: opacity 1s var(--ease-out);
+    will-change: opacity;
+  }
+  .sp-frame.is-active { opacity: 1; z-index: 1; }
+
+  .sp-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scale(1.04);
+  }
+  /* slow ken-burns drift only on the active frame */
+  .sp-frame.is-active .sp-img { animation: kenburns 7s var(--ease-out) forwards; }
+  @keyframes kenburns { from { transform: scale(1.04); } to { transform: scale(1.13) translate(-1.5%, -1.5%); } }
+
+  .sp-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(5,7,10,0.15) 0%, transparent 35%, rgba(5,7,10,0.9) 100%);
+  }
+
+  .sp-cap {
+    position: absolute; left: clamp(1rem, 3vw, 2.4rem); bottom: clamp(1.2rem, 3vw, 2rem);
+    right: clamp(1rem, 3vw, 2.4rem);
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem;
+    transform: translateY(12px); opacity: 0;
+    transition: opacity 0.8s var(--ease-out) 0.2s, transform 0.8s var(--ease-out) 0.2s;
+    z-index: 2;
+  }
+  .sp-frame.is-active .sp-cap { transform: none; opacity: 1; }
+  /* reel caption is always shown (no slideshow reveal) */
+  .sp-cap--static { transform: none; opacity: 1; }
+  .sp-chip {
+    font-family: var(--font-display); font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold-bright);
+    padding: 0.25rem 0.7rem; border: var(--edge-gold);
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+  }
+  .sp-heading { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.3rem, 3.2vw, 2.1rem); color: var(--text); text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+  .sp-caption { color: var(--text-dim); font-size: clamp(0.9rem, 2vw, 1.05rem); text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+
+  .sp-dots {
+    position: absolute; bottom: 1rem; right: clamp(1rem, 3vw, 2.4rem);
+    display: flex; gap: 0.5rem; z-index: 2;
+  }
+  .sp-dot {
+    width: 26px; height: 4px; padding: 0; border: 0;
+    background: rgba(255,255,255,0.25);
+    transition: background 0.3s var(--ease-out), box-shadow 0.3s;
+  }
+  .sp-dot.is-active { background: var(--gold-bright); box-shadow: 0 0 10px rgba(255,198,0,0.7); }
+  .sp-dot:hover { background: rgba(255,198,0,0.6); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sp-frame, .sp-cap { transition: none; }
+    .sp-frame.is-active .sp-img { animation: none; transform: scale(1.04); }
+  }
+</style>

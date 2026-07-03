@@ -1,0 +1,386 @@
+---
+import Countdown from './Countdown.tsx';
+import { getContent, getPhaseContent, fallbackContent } from '../lib/content';
+
+const { content = fallbackContent } = Astro.props;
+const site = getContent(content);
+const p = getPhaseContent(content);
+---
+<section class="hero" id="top">
+  <!-- Layered backdrop: keyart + parallax embers + vignette. Pure CSS/decor, no JS. -->
+  <div class="hero-bg" aria-hidden="true">
+    <picture>
+      {site.brand.keyartBase && <source srcset={`${site.brand.keyartBase}.avif`} type="image/avif" />}
+      {site.brand.keyartBase && <source srcset={`${site.brand.keyartBase}.webp`} type="image/webp" />}
+      <img class="hero-keyart" src={site.brand.keyart} alt="" fetchpriority="high" decoding="async" width="1024" height="1536" />
+    </picture>
+    <div class="hero-vignette"></div>
+    <div class="hero-embers"></div>
+    <div class="hero-rune"></div>
+  </div>
+
+  <div class="hero-inner wrap">
+    <!-- Tight identity group: eyebrow → logo → headline → subhead -->
+    <div class="hero-lead">
+      {p.kicker && <p class="hero-kicker">{p.kicker}</p>}
+      <picture>
+        {site.brand.logoWebp && (
+          <source srcset={`${site.brand.logoWebp} 1x${site.brand.logo2xWebp ? `, ${site.brand.logo2xWebp} 2x` : ''}`} type="image/webp" />
+        )}
+        <img
+          class="hero-logo"
+          src={site.brand.logo}
+          srcset={`${site.brand.logo} 1x, ${site.brand.logo2x} 2x`}
+          alt={`${site.brand.name} logo`}
+          width="360"
+          height="384"
+          fetchpriority="high"
+        />
+      </picture>
+      <h1 class="hero-headline">
+        <span class="hl-1">{p.headline}</span>
+        {p.headline2 && <span class="hl-2">{p.headline2}</span>}
+      </h1>
+      <p class="hero-subhead">{p.subhead}</p>
+    </div>
+
+    {p.countdownTo && (
+      <div class="hero-countdown">
+        <!-- Gate-lock: the countdown is the seal on the gate. A faint rune sigil
+             sits behind it (grok's ยันต์, kept as ornament — codex's call). -->
+        <span class="cd-rune" aria-hidden="true"></span>
+        <Countdown client:load to={p.countdownTo} label={p.countdownLabel} />
+      </div>
+    )}
+
+    <div class="hero-cta">
+      <a
+        class="btn btn-epic"
+        href={p.ctaPrimary.href}
+        {...p.ctaPrimary.href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {}}
+      >
+        {p.ctaPrimary.href.includes('discord') && (
+          <svg class="btn-discord-logo" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.6 12.6 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.2 14.2 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.1 13.1 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.3 12.3 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.84 19.84 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028M8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419c0-1.333.955-2.42 2.157-2.42c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.419-2.157 2.419m7.975 0c-1.183 0-2.157-1.086-2.157-2.419c0-1.333.955-2.42 2.157-2.42c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.419-2.157 2.419"/>
+          </svg>
+        )}
+        <span>{p.ctaPrimary.label}</span>
+      </a>
+      <a
+        class="btn btn-ghost"
+        href={p.ctaSecondary.href}
+        {...p.ctaSecondary.href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {}}
+      >
+        {p.ctaSecondary.label}
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-scroll" aria-hidden="true"><span></span></div>
+</section>
+
+<script>
+  // Subtle scroll parallax on the portal keyart — the gate drifts as you scroll
+  // away, giving depth WITHOUT scroll-jacking. rAF-throttled, capped, and only
+  // while the hero is on screen. Disabled for reduced-motion + narrow screens.
+  function initHeroParallax() {
+    const hero = document.getElementById('top');
+    // Parallax the whole backdrop wrapper — the keyart keeps its own kenburns
+    // animation (transforms don't collide because they're on different elements).
+    const bg = hero?.querySelector('.hero-bg') as HTMLElement | null;
+    if (!hero || !bg) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || window.innerWidth < 700) return;
+
+    let inView = true;
+    const io = new IntersectionObserver(
+      (es) => es.forEach((e) => { inView = e.isIntersecting; }),
+      { threshold: 0 }
+    );
+    io.observe(hero);
+
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking || !inView) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        // progress 0→1 across the first viewport of scroll. Backdrop drifts DOWN
+        // up to 22px → gentle depth as the hero leaves, no scroll-jack.
+        const p = Math.min(1, window.scrollY / window.innerHeight);
+        bg.style.transform = `translate3d(0, ${(p * 22).toFixed(1)}px, 0)`;
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+  initHeroParallax(); // deferred module — DOM is ready when this runs
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /* --- Backdrop --- */
+  /* will-change hints the compositor for the scroll parallax (transform only). */
+  .hero-bg { position: absolute; inset: 0; z-index: -2; will-change: transform; }
+  .hero-keyart {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    /* Portal keyart: symmetrical gate — keep it centered so the dark archway
+       void sits behind the logo/headline. A touch more visible than the old
+       portrait since it's a designed background. */
+    object-fit: cover; object-position: 50% 42%;
+    opacity: 0.82;
+    animation: kenburns 26s var(--ease-in-out) infinite alternate;
+  }
+  .hero-vignette {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(90% 70% at 50% 32%, transparent 30%, rgba(5,7,10,0.55) 72%, var(--ink) 100%),
+      linear-gradient(180deg, rgba(5,7,10,0.55) 0%, transparent 26%, transparent 55%, var(--ink) 98%);
+  }
+  /* Emerald floor haze + gold top glow — dialled WAY back (was the CG-scene look).
+     Just enough warmth at the base to seat the keyart, not a light show. */
+  .hero-rune {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(55% 34% at 50% 110%, rgba(26,220,0,0.07), transparent 64%),
+      radial-gradient(46% 26% at 50% -8%, rgba(255,198,0,0.06), transparent 62%);
+    mix-blend-mode: screen;
+  }
+  /* Floating embers — sparse, warm only (no cyan/green confetti). Subtle. */
+  .hero-embers {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 22% 82%, rgba(255,198,0,0.5), transparent),
+      radial-gradient(1.5px 1.5px at 72% 66%, rgba(255,170,0,0.4), transparent),
+      radial-gradient(1.5px 1.5px at 44% 90%, rgba(255,198,0,0.4), transparent);
+    background-repeat: no-repeat;
+    animation: rise 18s linear infinite;
+    opacity: 0.55;
+  }
+
+  /* --- Content --- */
+  .hero-inner {
+    display: flex; flex-direction: column; align-items: center;
+    /* Two visual groups: the identity lead (tight) then the action block (spaced) */
+    gap: clamp(2rem, 5vh, 3.2rem);
+    padding-block: clamp(4rem, 12vh, 8rem);
+    animation: fadeUp 1s var(--ease-out) both;
+  }
+  /* Identity lead — eyebrow, logo, headline, subhead sit close together as one unit */
+  .hero-lead { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; }
+
+  .hero-logo {
+    width: clamp(180px, 32vw, 340px);
+    height: auto;
+    margin-block: 0.2rem 0.4rem;
+    filter: drop-shadow(0 6px 30px rgba(0,0,0,0.7)) drop-shadow(0 0 24px rgba(255,198,0,0.25));
+    animation: float 6s var(--ease-in-out) infinite alternate;
+  }
+
+  /* Factual eyebrow above the logo — parchment, wide-tracked (Latin only, so tracking is fine) */
+  .hero-kicker {
+    order: -1; /* safety: always first in the lead group */
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-size: clamp(0.72rem, 1.7vw, 0.9rem);
+    color: #d1c7bd;                 /* parchment white — no longer clashes with the gold */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    padding-left: 0.32em;           /* offset the trailing letter-spacing so it stays centered */
+  }
+
+  /* Authored two-line headline. FLAT ivory — no gold gradient-clip (that glossy
+     text is the #1 AI tell). Line 1 = the return, line 2 = the promise, smaller +
+     gold to carry the one accent. Thai marks get headroom via line-height. */
+  .hero-headline {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.1em;
+    letter-spacing: 0;
+    padding-top: 0.1em;
+    font-weight: 700;
+  }
+  .hl-1 {
+    font-size: var(--fs-display);
+    line-height: 1.16;
+    color: var(--text);                      /* ivory, flat */
+    text-shadow: 0 2px 18px rgba(0,0,0,0.75); /* legibility over keyart, not a glow */
+  }
+  .hl-2 {
+    font-size: clamp(1.5rem, 4.4vw, 2.7rem);
+    line-height: 1.2;
+    color: var(--gold);                       /* the single warm accent line */
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .hero-subhead {
+    max-width: 42ch;
+    color: var(--text);
+    font-size: clamp(1.05rem, 2.5vw, 1.35rem);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.85);
+  }
+
+  /* The countdown is the GATE SEAL — the hero's second focal point after the logo.
+     A dark plate + double rune ring make it stand out (user: "ขอเด่นอีกนิด"). */
+  .hero-countdown {
+    position: relative; margin-top: 0.9rem; isolation: isolate;
+    padding: clamp(1.1rem, 3vw, 1.6rem) clamp(1.4rem, 4vw, 2.4rem);
+    background: radial-gradient(120% 120% at 50% 30%, rgba(5,7,10,0.66), rgba(5,7,10,0.4));
+    border: 1px solid rgba(255,198,0,0.22);
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.6), 0 0 40px rgba(255,198,0,0.08);
+    clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+  }
+  /* Rotating rune ring — brighter + thicker now so the "gate seal" reads clearly.
+     Two counter-rotating arcs give it a mechanical lock feel. */
+  .cd-rune, .cd-rune::after {
+    position: absolute; z-index: -1;
+    top: 50%; left: 50%;
+    width: 118%; aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .cd-rune {
+    border: 1px solid rgba(255,198,0,0.3);
+    background:
+      conic-gradient(from 0deg, transparent 0 70deg, rgba(255,198,0,0.28) 90deg, transparent 110deg),
+      conic-gradient(from 180deg, transparent 0 70deg, rgba(255,198,0,0.2) 90deg, transparent 110deg);
+    -webkit-mask: radial-gradient(circle, transparent 66%, #000 67%);
+            mask: radial-gradient(circle, transparent 66%, #000 67%);
+    animation: runeSpin 34s linear infinite;
+    opacity: 0.9;
+  }
+  .cd-rune::after {
+    content: '';
+    width: 132%;
+    border: 1px dashed rgba(255,198,0,0.16);
+    -webkit-mask: none; mask: none;
+    animation: runeSpin 60s linear infinite reverse;
+  }
+  @keyframes runeSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+  /* Hover the seal → the rune ring brightens + the plate edge glows a touch */
+  .hero-countdown { transition: box-shadow var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out); }
+  .hero-countdown:hover {
+    border-color: rgba(255,198,0,0.4);
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.55), 0 0 60px rgba(255,198,0,0.16);
+  }
+  .hero-countdown:hover .cd-rune { opacity: 1; filter: brightness(1.35); }
+  .cd-rune { transition: opacity var(--dur) var(--ease-out), filter var(--dur) var(--ease-out); }
+  @media (prefers-reduced-motion: reduce) { .cd-rune, .cd-rune::after { animation: none; } }
+
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-top: 0.8rem; }
+
+  /* --- Epic buttons (NOT flat) --- */
+  .btn {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem;
+    font-family: var(--font-display); font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 0.95rem 2.2rem; font-size: 0.98rem;
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), filter var(--dur-fast);
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  }
+  .btn-epic {
+    color: #1a1206;
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
+    border: 1px solid rgba(255,224,138,0.8);
+    /* Breathing glow draws the eye to the primary action */
+    animation: ctaPulse 2.6s var(--ease-in-out) infinite;
+  }
+  .btn-epic:hover { transform: translateY(-2px) scale(1.02); filter: brightness(1.08); box-shadow: 0 0 44px rgba(255,198,0,0.7), inset 0 1px 0 rgba(255,255,255,0.5); animation: none; }
+  .btn-epic:active { transform: translateY(0) scale(0.97); }
+  .btn-discord-logo { width: 22px; height: 22px; flex: 0 0 auto; }
+  @keyframes ctaPulse {
+    0%, 100% { box-shadow: 0 0 18px rgba(255,198,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4); }
+    50%      { box-shadow: 0 0 38px rgba(255,198,0,0.7), 0 0 8px rgba(64,205,60,0.35), inset 0 1px 0 rgba(255,255,255,0.5); }
+  }
+  .btn-epic::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%);
+    background-size: 250% 100%; background-position: 200% 0;
+    clip-path: inherit; pointer-events: none;
+  }
+  .btn-epic:hover::after { animation: sheen 0.9s var(--ease-out); }
+  .btn-ghost {
+    color: var(--gold-bright);
+    background: rgba(0,0,0,0.35);
+    border: var(--edge-gold);
+    box-shadow: inset 0 0 20px rgba(255,198,0,0.08);
+  }
+  .btn-ghost:hover { transform: translateY(-2px); background: rgba(255,198,0,0.1); box-shadow: var(--glow-gold); }
+
+  /* --- Scroll hint --- */
+  /* Minimal double-chevron scroll cue (replaces the old mouse glyph) */
+  .hero-scroll { position: absolute; bottom: 1.4rem; left: 50%; transform: translateX(-50%); z-index: 1; }
+  .hero-scroll span, .hero-scroll span::after {
+    display: block; width: 16px; height: 16px;
+    border-right: 2px solid rgba(255,198,0,0.55);
+    border-bottom: 2px solid rgba(255,198,0,0.55);
+    transform: rotate(45deg);
+  }
+  .hero-scroll span { animation: chev 1.7s var(--ease-in-out) infinite; }
+  .hero-scroll span::after {
+    content: ''; position: absolute; left: 0; top: -9px; opacity: 0.5;
+  }
+
+  /* --- Countdown (styles for the island) --- */
+  :global(.cd-label) {
+    display: inline-block;
+    font-family: var(--font-display); font-weight: 700;
+    letter-spacing: 0.28em; text-transform: uppercase;
+    font-size: 0.86rem; color: var(--gold-bright);
+    margin-bottom: 0.85rem; padding: 0.3rem 0.9rem;
+    background: rgba(5,7,10,0.5);
+    border-top: 1px solid rgba(255,198,0,0.3);
+    border-bottom: 1px solid rgba(255,198,0,0.3);
+    text-shadow: 0 1px 6px rgba(0,0,0,0.8), var(--glow-gold);
+  }
+  :global(.cd-grid) { display: flex; align-items: center; gap: 0.5rem; justify-content: center; }
+  :global(.cd-cell) {
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 62px; padding: 0.6rem 0.4rem;
+    background: linear-gradient(180deg, rgba(0,17,23,0.85), rgba(0,0,0,0.6));
+    border: var(--edge-gold);
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.5);
+    clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+  }
+  :global(.cd-num) { font-family: var(--font-display); font-size: clamp(1.5rem,4vw,2.1rem); font-weight: 900; color: var(--gold-bright); line-height: 1; text-shadow: var(--glow-gold); display: inline-block; animation: cdTick 0.4s var(--ease-out); }
+  @keyframes cdTick { from { opacity: 0.2; transform: translateY(-40%) scale(0.9); } to { opacity: 1; transform: none; } }
+  :global(.cd-unit) { font-size: 0.62rem; letter-spacing: 0.15em; color: var(--text-dim); margin-top: 0.3rem; text-transform: uppercase; }
+  :global(.cd-sep) { color: var(--gold-deep); font-size: 1.6rem; font-weight: 700; }
+
+  /* --- Keyframes --- */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+  @keyframes float { to { transform: translateY(-12px); } }
+  @keyframes kenburns { to { transform: scale(1.08); } }
+  @keyframes rise { from { background-position-y: 0; } to { background-position-y: -100vh; } }
+  @keyframes sheen { from { background-position: 200% 0; } to { background-position: -50% 0; } }
+  @keyframes chev { 0%,100% { opacity: 0.45; transform: rotate(45deg) translate(-2px,-2px); } 50% { opacity: 1; transform: rotate(45deg) translate(2px,2px); } }
+
+  @media (max-width: 640px) {
+    /* Fit the hero to its content so the tall portrait keyart doesn't leave a
+       black void below the CTAs. Keyart hugs the top; content sits just under it. */
+    .hero { min-height: auto; }
+    .hero-inner { padding-block: clamp(5.5rem, 16vh, 8rem) clamp(3rem, 9vh, 5rem); }
+    .hero-keyart { object-position: 50% 38%; opacity: 0.72; }
+    /* extend the keyart’s dark base into the next section instead of a hard cut */
+    .hero-vignette {
+      background:
+        radial-gradient(120% 55% at 50% 22%, transparent 34%, rgba(5,7,10,0.5) 74%, var(--ink) 100%),
+        linear-gradient(180deg, rgba(5,7,10,0.5) 0%, transparent 24%, transparent 62%, var(--ink) 100%);
+    }
+    .hero-scroll { bottom: 0.9rem; }
+    :global(.cd-cell) { min-width: 52px; }
+  }
+</style>

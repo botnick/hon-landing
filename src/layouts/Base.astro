@@ -1,0 +1,146 @@
+---
+import '../styles/global.css';
+import { getContent, fallbackContent } from '../lib/content';
+import Navbar from '../components/Navbar.astro';
+import CursorTrail from '../components/CursorTrail.astro';
+
+const { content = fallbackContent, title: titleProp, description: descProp } = Astro.props;
+const site = getContent(content);
+const seo = site.seo;
+const title = titleProp ?? seo.title;
+const description = descProp ?? seo.description;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net');
+---
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical.href} />
+    <meta name="theme-color" content={seo.themeColor} />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.brand.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(seo.ogImage, canonical).href} />
+    <meta property="og:url" content={canonical.href} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL(seo.ogImage, canonical).href} />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Preload the LCP hero keyart (AVIF) so it paints ASAP -->
+    {site.brand.keyartBase && (
+      <link rel="preload" as="image" href={`${site.brand.keyartBase}.avif`} type="image/avif" fetchpriority="high" />
+    )}
+
+    <!-- Fonts: IBM Plex Sans Thai (Thai-native, crisp) + IBM Plex Sans for latin. Matches tokens.css. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- VideoGame structured data for SEO -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'VideoGame',
+      name: 'Heroes of Newerth X',
+      alternateName: 'HoN X',
+      genre: 'MOBA',
+      url: canonical.href,
+      image: new URL(seo.ogImage, canonical).href,
+      description: description,
+    })} />
+  </head>
+  <body>
+    <!-- Signature: the black stone GATE splits open on first paint, revealing the
+         battlefield. Two halves driven by clip-path over ~820ms — no scroll-jack,
+         hits within 1s, then removes itself so it never blocks scroll/clicks.
+         Hidden entirely for reduced-motion and if JS is off (no-js keeps it gone). -->
+    <div class="gate" id="gate" aria-hidden="true">
+      <div class="gate-half gate-half--l"></div>
+      <div class="gate-half gate-half--r"></div>
+      <div class="gate-seam"></div>
+    </div>
+
+    <Navbar content={content} />
+
+    <slot />
+
+    <!-- Optional mystical cursor trail (off by default, user-toggleable) -->
+    <CursorTrail />
+
+    <script is:inline>
+      // Fire the gate open after first paint, then strip the node.
+      (function () {
+        var gate = document.getElementById('gate');
+        if (!gate) return;
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { gate.remove(); return; }
+        // double-rAF: ensure the browser has committed the closed state before we open
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            gate.classList.add('is-open');
+            setTimeout(function () { gate.remove(); }, 1100);
+          });
+        });
+      })();
+    </script>
+    <script>
+      // Scroll-reveal: fade+rise each section once as it scrolls into view.
+      // Skips the hero (id="top") which already animates on load, and respects reduced-motion.
+      function initReveal() {
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const sections = Array.from(document.querySelectorAll('section')).filter((s) => s.id !== 'top');
+        const staggers = Array.from(document.querySelectorAll('[data-stagger]'));
+
+        // Assign per-child stagger delays up front (cheap; capped so long lists don't drag).
+        staggers.forEach((c) => {
+          const items = c.querySelectorAll('.r-item');
+          items.forEach((el, i) => {
+            el.style.transitionDelay = Math.min(i * 90, 540) + 'ms';
+          });
+        });
+
+        if (reduce || !('IntersectionObserver' in window)) {
+          sections.forEach((s) => s.classList.add('reveal', 'is-in'));
+          staggers.forEach((c) => c.classList.add('is-in'));
+          return;
+        }
+        sections.forEach((s) => s.classList.add('reveal'));
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add('is-in');
+                io.unobserve(e.target);
+              }
+            });
+          },
+          { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+        );
+        sections.forEach((s) => io.observe(s));
+        // Stagger containers reveal a touch earlier (rootMargin) so items finish as you reach them.
+        const sio = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) { e.target.classList.add('is-in'); sio.unobserve(e.target); }
+            });
+          },
+          { threshold: 0.1, rootMargin: '0px 0px -6% 0px' }
+        );
+        staggers.forEach((c) => sio.observe(c));
+      }
+      initReveal(); // bundled as a deferred module — DOM is ready when this runs
+    </script>
+  </body>
+</html>

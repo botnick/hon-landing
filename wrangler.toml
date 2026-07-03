@@ -1,0 +1,32 @@
+# Cloudflare Pages config for hon-x-web.
+#
+# Bindings can be set EITHER here (committed, IDs are not secret) OR in the
+# Pages dashboard (Settings → Functions → Bindings). If you use the dashboard,
+# you can ignore the [[kv_namespaces]] / [[d1_databases]] blocks below.
+#
+# ADMIN_KEY / CF_API_TOKEN are SECRETS — never put them here. Set them with:
+#   wrangler pages secret put ADMIN_KEY
+#   wrangler pages secret put CF_API_TOKEN
+# or in the dashboard as encrypted environment variables.
+
+name = "hon-x-web"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Live content store (read by src/lib/content.ts). Fill in your namespace id.
+# Create it with:  wrangler kv namespace create SITE_KV
+# [[kv_namespaces]]
+# binding = "SITE_KV"
+# id = "<your-kv-namespace-id>"
+
+# Version history for /api/publish. Fill in your database id.
+# Create it with:  wrangler d1 create hon-x-db
+# [[d1_databases]]
+# binding = "SITE_DB"
+# database_name = "hon-x-db"
+# database_id = "<your-d1-database-id>"
+
+# Non-secret vars can live here; CF_ZONE_ID is optional (enables cache purge on publish).
+# [vars]
+# CF_ZONE_ID = "<your-zone-id>"

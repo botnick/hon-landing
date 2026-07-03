@@ -1,0 +1,151 @@
+---
+import { getNav, getContent, fallbackContent } from '../lib/content';
+
+const { content = fallbackContent } = Astro.props;
+const site = getContent(content);
+const nav = getNav(content);
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+
+const isActive = (href: string) => {
+  const target = href.replace(/\/$/, '') || '/';
+  return target === path;
+};
+---
+<header class="nav" id="site-nav">
+  <div class="nav-inner wrap">
+    <a class="nav-brand" href="/" aria-label={`${site.brand.name} — หน้าแรก`}>
+      <picture>
+        {site.brand.logoWebp && <source srcset={site.brand.logoWebp} type="image/webp" />}
+        <img src={site.brand.logo} alt={site.brand.name} width="72" height="77" />
+      </picture>
+      <span class="nav-brand-name">{site.brand.name}</span>
+    </a>
+
+    <nav class="nav-links" aria-label="เมนูหลัก">
+      {nav.links.map((l) => (
+        <a class="nav-link" href={l.href} aria-current={isActive(l.href) ? 'page' : undefined}>
+          {l.label}
+        </a>
+      ))}
+      <a
+        class="nav-member"
+        href={nav.member.href}
+        aria-current={isActive(nav.member.href) ? 'page' : undefined}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="3.4" />
+          <path d="M5.5 19.5c.9-3.4 3.4-5.1 6.5-5.1s5.6 1.7 6.5 5.1" />
+        </svg>
+        <span>{nav.member.label}</span>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<script>
+  // Transparent over the hero, solid plate once you scroll.
+  function syncNav() {
+    const nav = document.getElementById('site-nav');
+    if (!nav) return;
+    nav.classList.toggle('is-scrolled', window.scrollY > 24);
+  }
+  window.addEventListener('scroll', syncNav, { passive: true });
+  syncNav(); // deferred module — DOM is ready when this runs
+</script>
+
+<style>
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    /* readable over any keyart before first scroll */
+    background: linear-gradient(180deg, rgba(5,7,10,0.78), rgba(5,7,10,0));
+    border-bottom: 1px solid transparent;
+    transition: background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), backdrop-filter var(--dur) var(--ease-out);
+  }
+  .nav.is-scrolled {
+    background: rgba(5, 7, 10, 0.88);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-bottom-color: var(--brass-soft);
+  }
+
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem;
+    height: 64px;
+  }
+
+  /* --- Brand --- */
+  .nav-brand {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    min-width: 0;
+  }
+  .nav-brand img {
+    width: 40px; height: auto;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.7));
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .nav-brand:hover img { transform: scale(1.06); }
+  .nav-brand-name {
+    font-family: var(--font-latin); font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    font-size: 0.95rem; color: var(--text);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+
+  /* --- Links --- */
+  .nav-links { display: flex; align-items: center; gap: clamp(0.2rem, 2vw, 1rem); }
+  .nav-link {
+    position: relative;
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 0.92rem; letter-spacing: 0.04em;
+    color: var(--text-dim);
+    padding: 0.55rem clamp(0.5rem, 1.6vw, 0.9rem);
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .nav-link:hover { color: var(--text); }
+  /* engraved brass underline for the current page */
+  .nav-link::after {
+    content: '';
+    position: absolute; left: 50%; bottom: 0.2rem;
+    width: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    transform: translateX(-50%);
+    transition: width var(--dur-fast) var(--ease-out);
+  }
+  .nav-link:hover::after { width: 60%; }
+  .nav-link[aria-current='page'] { color: var(--gold-bright); }
+  .nav-link[aria-current='page']::after { width: 70%; }
+
+  /* --- Member button — the one accent in the bar --- */
+  .nav-member {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    margin-left: clamp(0.2rem, 1.5vw, 0.8rem);
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 0.88rem; letter-spacing: 0.06em;
+    color: var(--gold-bright);
+    padding: 0.5rem clamp(0.8rem, 2vw, 1.2rem);
+    background: rgba(0,0,0,0.35);
+    border: var(--edge-gold);
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast), box-shadow var(--dur-fast);
+  }
+  .nav-member svg { width: 17px; height: 17px; flex: 0 0 auto; }
+  .nav-member:hover {
+    transform: translateY(-1px);
+    background: rgba(255,198,0,0.12);
+    box-shadow: var(--glow-gold);
+  }
+  .nav-member[aria-current='page'] {
+    background: rgba(255,198,0,0.14);
+    box-shadow: inset 0 0 14px rgba(255,198,0,0.12);
+  }
+
+  @media (max-width: 560px) {
+    .nav-inner { height: 56px; }
+    .nav-brand-name { display: none; }
+    .nav-link { font-size: 0.86rem; }
+    .nav-member span { font-size: 0.82rem; }
+  }
+</style>

@@ -1,0 +1,24 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# logs & caches
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.cache/
+
+# env & secrets
+.env
+.env.*
+.dev.vars
+.wrangler/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

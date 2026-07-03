@@ -1,0 +1,262 @@
+---
+import { getFactions, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const f = getFactions(content);
+const L = f.legion;
+const H = f.hellbourne;
+// All faction visuals are data-driven (colors/glow/crest/text from site.json) — nothing hardcoded.
+const vars = `--l-accent:${L.accent}; --l-glow:${L.glow}; --h-accent:${H.accent}; --h-glow:${H.glow};`;
+---
+<!-- Inner partial of the War Reel (Act 3). Shared act-head + beat-label live in
+     WarReel; this renders just the faction stage. -->
+<div class="fc">
+  <!-- Diagonal split: two halves cut by a slanted seam. Hover a side → it expands, the other recedes. -->
+  <div class="fc-split" style={vars}>
+    <div class="fc-side fc-side--legion">
+      <img class="fc-bg" src={L.crest} alt="" aria-hidden="true" />
+      <div class="fc-veil"></div>
+      <div class="fc-content">
+        <img class="fc-crest" src={L.crest} alt={`ตราสัญลักษณ์ ${L.name}`} width="120" height="120" loading="lazy" />
+        <h3 class="fc-name">{L.name}</h3>
+        <p class="fc-tag">{L.tagline}</p>
+        <p class="fc-lore">{L.lore}</p>
+      </div>
+    </div>
+
+    <div class="fc-side fc-side--hellbourne">
+      <img class="fc-bg" src={H.crest} alt="" aria-hidden="true" />
+      <div class="fc-veil"></div>
+      <div class="fc-content">
+        <img class="fc-crest" src={H.crest} alt={`ตราสัญลักษณ์ ${H.name}`} width="120" height="120" loading="lazy" />
+        <h3 class="fc-name">{H.name}</h3>
+        <p class="fc-tag">{H.tagline}</p>
+        <p class="fc-lore">{H.lore}</p>
+      </div>
+    </div>
+
+    <span class="fc-vs" aria-hidden="true">VS</span>
+  </div>
+
+  <!-- Mobile-only slider controls (hidden on desktop; the diagonal split has no arrows) -->
+  <div class="fc-nav" aria-hidden="true">
+    <button class="fc-arrow fc-arrow--prev" type="button" aria-label="ฝ่ายก่อนหน้า">‹</button>
+    <div class="fc-dots">
+      <span class="fc-dot is-active" data-i="0"></span>
+      <span class="fc-dot" data-i="1"></span>
+    </div>
+    <button class="fc-arrow fc-arrow--next" type="button" aria-label="ฝ่ายถัดไป">›</button>
+  </div>
+</div>
+
+<script>
+  // Mobile slider: only wires up when the split is in horizontal-scroll (touch) mode.
+  const split = document.querySelector('.fc-split') as HTMLElement | null;
+  const nav = document.querySelector('.fc-nav') as HTMLElement | null;
+  if (split && nav) {
+    const sides = [...split.querySelectorAll('.fc-side')] as HTMLElement[];
+    const dots = [...nav.querySelectorAll('.fc-dot')] as HTMLElement[];
+    const prev = nav.querySelector('.fc-arrow--prev') as HTMLButtonElement;
+    const next = nav.querySelector('.fc-arrow--next') as HTMLButtonElement;
+    const isMobile = () => matchMedia('(max-width: 720px)').matches;
+
+    const goTo = (i: number) => {
+      const idx = Math.max(0, Math.min(sides.length - 1, i));
+      split.scrollTo({ left: idx * split.clientWidth, behavior: 'smooth' });
+    };
+    const current = () => Math.round(split.scrollLeft / Math.max(1, split.clientWidth));
+
+    prev?.addEventListener('click', () => goTo(current() - 1));
+    next?.addEventListener('click', () => goTo(current() + 1));
+    dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+
+    // Reflect active dot + fade arrows at the ends while swiping.
+    let raf = 0;
+    split.addEventListener('scroll', () => {
+      if (!isMobile()) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const i = current();
+        dots.forEach((d, di) => d.classList.toggle('is-active', di === i));
+        prev?.toggleAttribute('data-edge', i === 0);
+        next?.toggleAttribute('data-edge', i === sides.length - 1);
+      });
+    }, { passive: true });
+    // start state
+    prev?.setAttribute('data-edge', '');
+  }
+</script>
+
+<style>
+  /* Inner partial: no own top padding — WarReel spaces the act + provides the label. */
+  .fc { padding: 0; }
+
+  /* --- Diagonal split stage --- */
+  .fc-split {
+    position: relative;
+    width: min(1240px, 96vw);
+    margin-inline: auto;
+    height: clamp(420px, 60vh, 600px);
+    overflow: hidden;
+    border: 1px solid var(--brass);   /* flat brass frame, not a gold glow edge */
+    box-shadow: var(--shadow-deep);
+    isolation: isolate;
+  }
+
+  .fc-side {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    transition: clip-path 0.55s var(--ease-out);
+    will-change: clip-path;
+  }
+  /* Legion owns the lower-left; Hellbourne the upper-right — seam is a diagonal. */
+  .fc-side--legion    { clip-path: polygon(0 0, 62% 0, 38% 100%, 0 100%); z-index: 1; }
+  .fc-side--hellbourne{ clip-path: polygon(62% 0, 100% 0, 100% 100%, 38% 100%); z-index: 1; }
+
+  /* Hover expands the hovered side across the seam, the other yields. */
+  .fc-split:hover .fc-side--legion { clip-path: polygon(0 0, 50% 0, 26% 100%, 0 100%); }
+  .fc-split:hover .fc-side--hellbourne { clip-path: polygon(50% 0, 100% 0, 100% 100%, 26% 100%); }
+  .fc-side--legion:hover { clip-path: polygon(0 0, 82% 0, 58% 100%, 0 100%) !important; z-index: 2; }
+  .fc-side--hellbourne:hover { clip-path: polygon(42% 0, 100% 0, 100% 100%, 18% 100%) !important; z-index: 2; }
+
+  .fc-bg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+    opacity: 0.14;
+    filter: saturate(1.1) blur(1px);
+    transform: scale(1.05);
+    transition: transform 0.6s var(--ease-out), opacity 0.6s var(--ease-out);
+  }
+  .fc-side:hover .fc-bg { opacity: 0.28; transform: scale(1.12); }
+
+  .fc-veil { position: absolute; inset: 0; transition: background 0.5s var(--ease-out); }
+  .fc-side--legion .fc-veil {
+    background:
+      radial-gradient(80% 90% at 30% 50%, color-mix(in srgb, var(--l-accent) 16%, transparent), transparent 70%),
+      linear-gradient(120deg, rgba(5,7,10,0.72), rgba(5,7,10,0.9));
+  }
+  .fc-side--legion:hover .fc-veil {
+    background:
+      radial-gradient(80% 90% at 30% 50%, color-mix(in srgb, var(--l-accent) 30%, transparent), transparent 72%),
+      linear-gradient(120deg, rgba(5,7,10,0.5), rgba(5,7,10,0.82));
+  }
+  .fc-side--hellbourne .fc-veil {
+    background:
+      radial-gradient(80% 90% at 70% 50%, color-mix(in srgb, var(--h-accent) 16%, transparent), transparent 70%),
+      linear-gradient(240deg, rgba(5,7,10,0.72), rgba(5,7,10,0.9));
+  }
+  .fc-side--hellbourne:hover .fc-veil {
+    background:
+      radial-gradient(80% 90% at 70% 50%, color-mix(in srgb, var(--h-accent) 30%, transparent), transparent 72%),
+      linear-gradient(240deg, rgba(5,7,10,0.5), rgba(5,7,10,0.82));
+  }
+
+  .fc-content {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 0.7rem;
+    padding: clamp(1.5rem, 4vw, 3.5rem);
+    max-width: 46%;
+  }
+  .fc-side--hellbourne .fc-content { right: 0; left: auto; text-align: right; align-items: flex-end; margin-left: auto; }
+
+  .fc-crest {
+    width: clamp(72px, 10vw, 112px); height: auto; object-fit: contain;
+    transition: transform 0.5s var(--ease-out), filter 0.5s var(--ease-out);
+  }
+  .fc-side--legion .fc-crest { filter: drop-shadow(0 0 16px var(--l-glow)); }
+  .fc-side--hellbourne .fc-crest { filter: drop-shadow(0 0 16px var(--h-glow)); }
+  .fc-side:hover .fc-crest { transform: scale(1.08) translateY(-2px); }
+
+  .fc-name {
+    font-size: clamp(1.6rem, 4.5vw, 2.6rem);
+    letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.15;
+  }
+  .fc-side--legion .fc-name { color: var(--l-accent); text-shadow: 0 0 22px var(--l-glow); }
+  .fc-side--hellbourne .fc-name { color: var(--h-accent); text-shadow: 0 0 22px var(--h-glow); }
+  .fc-tag { font-size: clamp(0.8rem, 2vw, 0.95rem); letter-spacing: 0.08em; color: var(--text-dim); text-transform: uppercase; }
+  .fc-lore {
+    font-size: clamp(0.9rem, 1.9vw, 1.05rem); line-height: 1.7; color: var(--text-dim);
+    max-width: 40ch;
+    opacity: 0.85; transition: opacity 0.5s var(--ease-out);
+  }
+  .fc-side:hover .fc-lore { opacity: 1; }
+
+  /* center VS emblem on the seam */
+  .fc-vs {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 3;
+    font-family: var(--font-display); font-weight: 900;
+    font-size: clamp(1.1rem, 2.6vw, 1.6rem); letter-spacing: 0.1em;
+    color: var(--gold); padding: 0.5rem 0.7rem;
+    background: rgba(5,7,10,0.85); border: var(--edge-gold); box-shadow: var(--glow-gold);
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    pointer-events: none;
+    transition: opacity 0.4s var(--ease-out);
+  }
+  .fc-split:hover .fc-vs { opacity: 0; }
+
+  /* --- Mobile slider chrome (hidden on desktop) --- */
+  .fc-nav { display: none; }
+
+  /* mobile: swipeable horizontal slider — one faction per slide, snap + arrows + dots */
+  @media (max-width: 720px) {
+    .fc-split {
+      height: clamp(440px, 72vh, 620px);
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .fc-split::-webkit-scrollbar { display: none; }
+
+    /* each side becomes a full-width snap slide; kill the diagonal + hover states */
+    .fc-side,
+    .fc-split .fc-side--legion,
+    .fc-split .fc-side--hellbourne,
+    .fc-split:hover .fc-side,
+    .fc-side:hover {
+      position: relative;
+      inset: auto;
+      flex: 0 0 100%;
+      width: 100%;
+      clip-path: none !important;
+      scroll-snap-align: center;
+      scroll-snap-stop: always;
+    }
+    .fc-bg { opacity: 0.24; }
+
+    .fc-content { max-width: 100%; position: relative; inset: auto; text-align: center; align-items: center; padding: clamp(2rem, 8vw, 3rem); }
+    .fc-side--hellbourne .fc-content { text-align: center; align-items: center; margin-left: 0; }
+    .fc-lore { opacity: 1; }
+    .fc-vs { display: none; }
+
+    /* nav row under the slider */
+    .fc-nav {
+      display: flex; align-items: center; justify-content: center; gap: 1.2rem;
+      width: min(1240px, 96vw); margin: 1.1rem auto 0;
+    }
+    .fc-arrow {
+      width: 44px; height: 44px; flex: 0 0 auto;
+      display: grid; place-items: center;
+      font-size: 1.7rem; line-height: 1; color: var(--gold);
+      background: rgba(5,7,10,0.7);
+      border: var(--edge-gold);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      transition: transform var(--dur-fast), color var(--dur-fast), opacity var(--dur-fast);
+      cursor: pointer;
+    }
+    .fc-arrow:active { transform: scale(0.9); }
+    .fc-arrow[data-edge] { opacity: 0.3; pointer-events: none; }
+    .fc-dots { display: flex; gap: 0.6rem; }
+    .fc-dot {
+      width: 9px; height: 9px; transform: rotate(45deg);
+      background: rgba(255,198,0,0.28);
+      transition: background var(--dur-fast), box-shadow var(--dur-fast);
+      cursor: pointer;
+    }
+    .fc-dot.is-active { background: var(--gold); box-shadow: var(--glow-gold); }
+  }
+</style>

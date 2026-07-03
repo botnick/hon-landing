@@ -1,0 +1,124 @@
+---
+import { getServerOath, getSocial, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const o = getServerOath(content);
+const social = getSocial(content);
+---
+<section class="oath" id="oath">
+  <div class="wrap oath-inner">
+    <!-- Cold-open intro (was the Manifesto) — sets the stakes, then the proof. -->
+    <header class="oath-head">
+      <p class="act-eyebrow">{o.eyebrow}</p>
+      <h2 class="oath-title">{o.title}</h2>
+      <p class="oath-intro">{o.intro}</p>
+    </header>
+
+    <!-- Proof rows (was the Why cards). Numbered, left-aligned, readable in 3s.
+         This is the trust core: it answers the real Thai-player pain directly. -->
+    <ol class="oath-proofs" data-stagger>
+      {o.proofs.map((pr) => (
+        <li class="proof r-item">
+          <span class="proof-no" aria-hidden="true">{pr.no}</span>
+          <div class="proof-body">
+            <h3 class="proof-title">{pr.title}</h3>
+            <p class="proof-text">{pr.body}</p>
+          </div>
+          <span class="proof-metric">{pr.metric}</span>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<style>
+  .oath { padding-block: var(--section-pad); position: relative; }
+  .oath-inner { max-width: 1000px; margin-inline: auto; }
+
+  /* Head is left-aligned (breaks the centered-everything AI pattern after the hero) */
+  .oath-head { max-width: 60ch; margin-bottom: clamp(3.4rem, 8vh, 5.5rem); }
+  .oath-title {
+    font-size: var(--fs-h2); line-height: var(--lh-head);
+    color: var(--text); letter-spacing: 0.01em;
+  }
+  .oath-intro {
+    margin-top: 1rem; color: var(--text-dim);
+    font-size: var(--fs-lead); line-height: var(--lh-body);
+  }
+
+  /* --- Proof rows: an engraved ledger, one hairline between each. Roomy — lots
+     of vertical air so it breathes (was too tight). --- */
+  .oath-proofs { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--brass-soft); }
+  .proof {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: clamp(1.6rem, 4vw, 3.4rem);
+    padding-block: clamp(2.4rem, 5vw, 3.4rem);
+    padding-inline: clamp(0.5rem, 2vw, 1.5rem);
+    border-bottom: 1px solid var(--brass-soft);
+    transition: background 220ms var(--ease-out);
+  }
+  /* subtle hover only via the mouse — never a stuck fill on any single row */
+  @media (hover: hover) {
+    .proof:hover { background: rgba(191,151,73,0.03); }
+  }
+
+  /* Big engraved index — the ONE gold accent per row */
+  .proof-no {
+    font-family: var(--font-latin); font-weight: 700;
+    font-size: clamp(1.7rem, 4.4vw, 2.7rem); line-height: 1;
+    color: var(--gold-deep);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    align-self: center;
+  }
+  .proof-body { min-width: 0; }
+  .proof-title {
+    font-size: var(--fs-h3); line-height: var(--lh-head);
+    color: var(--text); letter-spacing: 0.01em;
+  }
+  .proof-text {
+    margin-top: 0.6rem; color: var(--text-dim);
+    font-size: var(--fs-body); line-height: var(--lh-body);
+    max-width: 52ch;
+  }
+  /* Metric chip — a flat brass-hairline tag (Latin, tracked). Sits right on desktop. */
+  .proof-metric {
+    align-self: center;
+    font-family: var(--font-latin); font-weight: 600;
+    font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--gold-bright);
+    white-space: nowrap;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--brass);
+    background: rgba(191,151,73,0.05);
+    transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+  /* Whole row hover lifts its chip — the metric feels "confirmed" on hover */
+  @media (hover: hover) {
+    .proof:hover .proof-metric {
+      border-color: var(--brass-strong);
+      background: rgba(191,151,73,0.1);
+      box-shadow: 0 0 18px rgba(255,198,0,0.1);
+      transform: translateY(-1px);
+    }
+    .proof:hover .proof-no { color: var(--gold); transition: color 220ms var(--ease-out); }
+  }
+
+  @media (max-width: 680px) {
+    /* Stack: number badges the row, metric drops under the text. No swipe rail —
+       these are proof, they must all be visible (codex: readable in 3s). */
+    .proof {
+      grid-template-columns: auto 1fr;
+      gap: 0.9rem 1.2rem;
+      align-items: start;
+      padding-block: clamp(1.9rem, 6vw, 2.6rem);
+      padding-inline: 0;
+    }
+    .proof-no { align-self: start; font-size: 1.7rem; }
+    .proof-metric {
+      grid-column: 2; justify-self: start;
+      margin-top: 0.9rem; font-size: 0.68rem;
+    }
+  }
+</style>
