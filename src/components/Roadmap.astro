@@ -1,0 +1,115 @@
+---
+import { getRoadmap, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const r = getRoadmap(content);
+// Mark each stage relative to the active one: done / active / upcoming.
+const activeIdx = r.stages.findIndex((s) => s.id === r.activeStage);
+const stages = r.stages.map((s, i) => ({
+  ...s,
+  state: i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'upcoming',
+}));
+---
+<section class="road" id="roadmap">
+  <div class="wrap road-inner">
+    <header class="road-head">
+      <p class="act-eyebrow">{r.eyebrow}</p>
+      <h2 class="road-title">{r.title}</h2>
+      {r.intro && <p class="road-intro">{r.intro}</p>}
+    </header>
+
+    <!-- One rail, not three cards. A single hairline threads the stages; the
+         current stage is the only solid brass dot. No dates = evergreen + reusable
+         at launch (just move activeStage). -->
+    <ol class="rail" data-stagger role="list">
+      {stages.map((s) => (
+        <li class={`node node--${s.state} r-item`}>
+          <span class="node-dot" aria-hidden="true"></span>
+          <span class="node-label">{s.label}</span>
+          <span class="node-note">{s.note}</span>
+          {s.state === 'active' && <span class="node-here">ตอนนี้</span>}
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<style>
+  .road { padding-block: var(--section-pad); position: relative; }
+  .road-inner { max-width: 1000px; margin-inline: auto; }
+  .road-head { max-width: 60ch; margin-bottom: clamp(3rem, 7vh, 4.5rem); }
+  .road-title { font-size: var(--fs-h2); line-height: var(--lh-head); color: var(--text); letter-spacing: 0.01em; }
+  .road-intro { margin-top: 1rem; color: var(--text-dim); font-size: var(--fs-lead); line-height: var(--lh-body); }
+
+  /* Horizontal rail on desktop: dots on a shared hairline, labels below. */
+  .rail {
+    list-style: none; margin: 0; padding: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--n, 3), 1fr);
+    position: relative;
+  }
+  /* the connecting hairline runs through the dot row */
+  .rail::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 1px;
+    background: var(--brass-soft);
+  }
+  .node {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto auto auto;
+    gap: 0.9rem;
+    padding-inline: clamp(0.4rem, 1.5vw, 1rem);
+    align-content: start;
+  }
+  .node-dot {
+    width: 15px; height: 15px; border-radius: 50%;
+    justify-self: start;
+    border: 1px solid var(--brass);
+    background: var(--ink);
+    position: relative; z-index: 1;
+  }
+  .node--done .node-dot { background: var(--brass); border-color: var(--brass); }
+  .node--active .node-dot {
+    background: var(--gold-deep); border-color: var(--gold-bright);
+    box-shadow: 0 0 0 4px rgba(199,138,30,0.14);
+  }
+  .node-label {
+    font-family: var(--font-latin); font-weight: 700; letter-spacing: 0.02em;
+    font-size: var(--fs-h3); color: var(--text-dim);
+  }
+  .node--active .node-label { color: var(--text); }
+  .node--done .node-label { color: var(--text); }
+  .node-note {
+    color: var(--text-dim); font-size: var(--fs-body); line-height: var(--lh-body);
+    max-width: 30ch; opacity: 0.9;
+  }
+  .node--upcoming .node-note { opacity: 0.6; }
+  .node-here {
+    justify-self: start;
+    font-family: var(--font-latin); font-weight: 600;
+    font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold-bright);
+    padding: 0.24rem 0.6rem;
+    border: 1px solid var(--brass);
+    background: rgba(191,151,73,0.06);
+  }
+
+  /* Mobile: rail rotates vertical — dots stack on a left hairline. */
+  @media (max-width: 720px) {
+    .rail { grid-template-columns: 1fr; }
+    .rail::before { left: 7px; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
+    .node {
+      grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+      column-gap: 1.1rem; row-gap: 0.4rem;
+      padding: 0 0 clamp(2rem, 6vw, 2.6rem) 0;
+      align-items: start;
+    }
+    .node-dot { grid-row: 1 / span 2; margin-top: 4px; }
+    .node-label { align-self: center; }
+    .node-note { grid-column: 2; max-width: none; }
+    .node-here { grid-column: 2; margin-top: 0.6rem; }
+  }
+</style>
+<style define:vars={{ railCols: stages.length }}>
+  /* data-driven column count so the rail fits any number of stages */
+  .rail { --n: var(--railCols); }
+</style>

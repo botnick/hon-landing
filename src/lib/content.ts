@@ -102,3 +102,6 @@ export function getSocial(content: SiteContent = fallbackContent) { return conte
 export function getNav(content: SiteContent = fallbackContent) { return content.nav; }
 export function getDownload(content: SiteContent = fallbackContent) { return content.download; }
 export function getMember(content: SiteContent = fallbackContent) { return content.member; }
+export function getRoadmap(content: SiteContent = fallbackContent) { return content.roadmap; }
+export function getFaq(content: SiteContent = fallbackContent) { return content.faq; }
+export function getPatchNotes(content: SiteContent = fallbackContent) { return content.patchNotes; }
