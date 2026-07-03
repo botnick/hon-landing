@@ -27,14 +27,22 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={new URL(seo.ogImage, canonical).href} />
+    <meta property="og:image:width" content={String(seo.ogImageWidth ?? 1200)} />
+    <meta property="og:image:height" content={String(seo.ogImageHeight ?? 630)} />
+    <meta property="og:image:type" content="image/jpeg" />
+    {seo.ogImageAlt && <meta property="og:image:alt" content={seo.ogImageAlt} />}
     <meta property="og:url" content={canonical.href} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={new URL(seo.ogImage, canonical).href} />
+    {seo.ogImageAlt && <meta name="twitter:image:alt" content={seo.ogImageAlt} />}
 
     <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Preload the LCP hero keyart (AVIF) so it paints ASAP -->
     {site.brand.keyartBase && (

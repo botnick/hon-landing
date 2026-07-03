@@ -224,7 +224,11 @@
   "seo": {
     "title": "HoN X — Heroes of Newerth หวนคืน | Closed Beta",
     "description": "Heroes of Newerth X — MOBA ที่เร็ว ดุ และบริสุทธิ์ที่สุด กลับมาอีกครั้ง สมัคร Closed Beta วันนี้ เข้าร่วมสนามรบแห่ง Newerth",
-    "ogImage": "/brand/keyart-portal.png",
+    "ogImage": "/og.jpg",
+    "ogImageWidth": 1200,
+    "ogImageHeight": 630,
+    "ogImageAlt": "HoN X — มันส์กว่าที่เคยจำได้ | Heroes of Newerth เซิร์ฟไทยแท้",
+    "ogImageSquare": "/og-square.jpg",
     "themeColor": "#ffc600"
   }
 }
