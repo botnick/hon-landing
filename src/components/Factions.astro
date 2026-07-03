@@ -37,10 +37,12 @@ const vars = `--l-accent:${L.accent}; --l-glow:${L.glow}; --h-accent:${H.accent}
     <span class="fc-vs" aria-hidden="true">VS</span>
   </div>
 
-  <!-- Mobile-only slider controls (hidden on desktop; the diagonal split has no arrows) -->
-  <div class="fc-nav" aria-hidden="true">
+  <!-- Mobile-only slider controls (hidden on desktop; the diagonal split has no arrows).
+       Container is NOT aria-hidden (it holds focusable buttons — that would trap keyboard
+       users on hidden controls); the decorative dots carry aria-hidden instead. -->
+  <div class="fc-nav">
     <button class="fc-arrow fc-arrow--prev" type="button" aria-label="ฝ่ายก่อนหน้า">‹</button>
-    <div class="fc-dots">
+    <div class="fc-dots" aria-hidden="true">
       <span class="fc-dot is-active" data-i="0"></span>
       <span class="fc-dot" data-i="1"></span>
     </div>

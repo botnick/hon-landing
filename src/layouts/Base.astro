@@ -49,13 +49,18 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
       <link rel="preload" as="image" href={`${site.brand.keyartBase}.avif`} type="image/avif" fetchpriority="high" />
     )}
 
-    <!-- Fonts: IBM Plex Sans Thai (Thai-native, crisp) + IBM Plex Sans for latin. Matches tokens.css. -->
+    <!-- Fonts: IBM Plex Sans Thai (Thai-native, crisp) + IBM Plex Sans for latin. Matches tokens.css.
+         Loaded non-render-blocking (preload → async swap) so first paint never waits on the
+         font CSS — kills the Thai-headline FOUT/CLS. tokens.css keeps a sane fallback stack. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    {(() => { const fontHref = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap'; return (
+    <>
+      <link rel="preload" as="style" href={fontHref} />
+      <link rel="stylesheet" href={fontHref} media="print" onload="this.media='all'" />
+      <noscript><link rel="stylesheet" href={fontHref} /></noscript>
+    </>
+    ); })()}
 
     <!-- VideoGame structured data for SEO -->
     <script type="application/ld+json" set:html={JSON.stringify({
@@ -64,9 +69,14 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
       name: 'Heroes of Newerth X',
       alternateName: 'HoN X',
       genre: 'MOBA',
+      gamePlatform: 'PC',
+      applicationCategory: 'Game',
+      operatingSystem: 'Windows',
+      inLanguage: 'th',
       url: canonical.href,
       image: new URL(seo.ogImage, canonical).href,
       description: description,
+      publisher: { '@type': 'Organization', name: site.brand.name, url: Astro.site?.href ?? canonical.href },
     })} />
   </head>
   <body>
@@ -150,5 +160,16 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
       }
       initReveal(); // bundled as a deferred module — DOM is ready when this runs
     </script>
+
+    {/* Cloudflare Web Analytics — cookie-less, no consent banner. Renders only when a
+        beacon token is set in site.json (seam), so it's off until configured. */}
+    {site.analytics?.cfBeaconToken && (
+      <script
+        is:inline
+        defer
+        src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon={`{"token": "${site.analytics.cfBeaconToken}"}`}
+      />
+    )}
   </body>
 </html>

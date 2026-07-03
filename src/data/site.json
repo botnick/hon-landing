@@ -230,5 +230,9 @@
     "ogImageAlt": "HoN X — มันส์กว่าที่เคยจำได้ | Heroes of Newerth เซิร์ฟไทยแท้",
     "ogImageSquare": "/og-square.jpg",
     "themeColor": "#ffc600"
+  },
+  "analytics": {
+    "_comment": "Cloudflare Web Analytics — cookie-less, no consent banner needed. Paste the beacon token from the CF dashboard to enable; empty = off.",
+    "cfBeaconToken": ""
   }
 }

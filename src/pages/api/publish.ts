@@ -17,14 +17,53 @@ interface Env {
   CF_API_TOKEN?: string;
 }
 
+// site.json is ~10 KB; cap well above that but far below the KV 25 MB limit.
+const MAX_BODY_BYTES = 512 * 1024;
+
+/** Length-independent constant-time string compare (avoids auth timing leaks). */
+function timingSafeEqual(a: string | null, b: string): boolean {
+  if (!a) return false;
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i % b.length);
+  }
+  return diff === 0;
+}
+
+/**
+ * Minimal structural guard for a content snapshot. Returns an error string when
+ * invalid, or null when it looks like a real site.json. Not a full schema — just
+ * enough that a broken/hostile publish can't blank or wreck the live site.
+ */
+function validateSnapshot(s: unknown): string | null {
+  if (typeof s !== 'object' || s === null || Array.isArray(s)) return 'not an object';
+  const o = s as Record<string, unknown>;
+  const brand = o.brand as Record<string, unknown> | undefined;
+  if (!brand || typeof brand.name !== 'string' || !brand.name.trim()) return 'brand.name missing';
+  if (typeof o.phase !== 'string') return 'phase missing';
+  if (typeof o.sections !== 'object' || o.sections === null) return 'sections missing';
+  if (typeof o.seo !== 'object' || o.seo === null) return 'seo missing';
+  const seo = o.seo as Record<string, unknown>;
+  if (typeof seo.title !== 'string' || !seo.title.trim()) return 'seo.title missing';
+  return null;
+}
+
 export const POST: APIRoute = async ({ request, locals }) => {
   const env = ((locals as any)?.runtime?.env ?? {}) as Env;
 
   if (!env.SITE_DB || !env.SITE_KV) {
     return json({ ok: false, error: 'bindings missing — running in local/fallback mode' }, 501);
   }
-  if (!env.ADMIN_KEY || request.headers.get('x-admin-key') !== env.ADMIN_KEY) {
+  // Constant-time key check so a valid key can't be brute-forced by timing.
+  if (!env.ADMIN_KEY || !timingSafeEqual(request.headers.get('x-admin-key'), env.ADMIN_KEY)) {
     return json({ ok: false, error: 'unauthorized' }, 401);
+  }
+
+  // Reject oversized bodies before parsing — a live-content endpoint must not eat
+  // an arbitrarily large payload (KV value cap is 25 MB; site.json is ~10 KB).
+  const clen = Number(request.headers.get('content-length') ?? '0');
+  if (clen > MAX_BODY_BYTES) {
+    return json({ ok: false, error: 'payload too large' }, 413);
   }
 
   let snapshot: unknown;
@@ -34,11 +73,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ ok: false, error: 'invalid json body' }, 400);
   }
 
-  // Version by counter so we get a monotonic, human-readable history.
-  const prev = Number((await env.SITE_KV.get('site:counter')) ?? '0');
-  const version = prev + 1;
-  const snapKey = `site:v${version}`;
+  // Shape-validate the snapshot: it becomes the LIVE site content on every render,
+  // so a malformed publish (even with a valid key) must be rejected, not served.
+  const invalid = validateSnapshot(snapshot);
+  if (invalid) {
+    return json({ ok: false, error: `invalid snapshot: ${invalid}` }, 422);
+  }
+
   const body = JSON.stringify(snapshot);
+  // Belt-and-suspenders: cap the serialized size even if content-length lied.
+  if (body.length > MAX_BODY_BYTES) {
+    return json({ ok: false, error: 'payload too large' }, 413);
+  }
+
+  // Version by counter so we get a monotonic, human-readable history.
+  // Guard against a missing/corrupt counter so we never overwrite v1 by accident.
+  const prev = Number((await env.SITE_KV.get('site:counter')) ?? '0');
+  const version = (Number.isFinite(prev) && prev >= 0 ? prev : 0) + 1;
+  const snapKey = `site:v${version}`;
   const now = new Date().toISOString();
 
   try {
