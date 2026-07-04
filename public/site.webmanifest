@@ -1,0 +1,14 @@
+{
+  "name": "HoN X — Heroes of Newerth",
+  "short_name": "HoN X",
+  "description": "Heroes of Newerth X — MOBA ที่เร็ว ดุ และบริสุทธิ์ที่สุด กลับมาอีกครั้ง เซิร์ฟไทยแท้",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e100e",
+  "theme_color": "#ffc600",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

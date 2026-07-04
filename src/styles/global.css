@@ -25,6 +25,12 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+/* background-attachment:fixed forces a full-viewport repaint on every scroll frame —
+   cheap on desktop, janky on mobile GPUs. The bg is only subtle gradients, so scrolling
+   it is visually indistinguishable. Drop `fixed` on small screens for smoother scroll. */
+@media (max-width: 768px) {
+  body { background-attachment: scroll; }
+}
 
 /* Film-grain overlay — a fixed, non-animated noise film over the whole page.
    Kills the "clean CG gradient" feel that reads as AI. Inline SVG, no asset,
