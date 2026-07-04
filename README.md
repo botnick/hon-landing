@@ -24,6 +24,12 @@ Four acts, each data-driven:
 
 All copy lives in [`src/data/site.json`](src/data/site.json). Components read it through [`src/lib/content.ts`](src/lib/content.ts), which resolves live content from a Cloudflare **KV** binding (`SITE_KV`) when present and falls back to the bundled JSON otherwise — so `astro dev` and any KV-less host work unchanged. The `/api/publish` route writes a versioned snapshot to D1 + KV and purges the edge cache for instant admin hot-reload.
 
+### i18n (th / en)
+
+Thai is the base language at `/`; English lives at `/en/` with a TH/EN switch in the navbar (the switch preserves the current `#/…` view). English is a **text overlay**, not a second content tree: [`src/data/site.en.json`](src/data/site.en.json) holds only translated strings and `localizeContent()` deep-merges it over the resolved (bundled or live-KV) content — hrefs, dates, colors, `phase`, and section toggles stay shared, so an admin publish updates both languages at once. Chrome strings that don't belong to a section (countdown units, aria labels) live under the `ui` key and are translated the same way. Both pages emit `hreflang` alternates and language-correct `<html lang>` / OG locale tags.
+
+To change English copy, edit `site.en.json` (keep array order/length matching `site.json` — arrays merge element-wise, and entries may be partial).
+
 ### Performance
 
 - AVIF/WebP everywhere via `<picture>`, PNG fallback
