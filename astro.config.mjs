@@ -3,16 +3,29 @@ import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import cloudflare from '@astrojs/cloudflare';
 
-// Hybrid rendering (peer consensus — Codex + Gemini):
-// - Landing SSRs per request so admin edits (KV) show up instantly AND stay SEO-crawlable.
-// - content.ts reads KV via Astro.locals.runtime.env when present, else falls back to the
-//   bundled site.json — so `astro dev` and any KV-less environment still work unchanged.
-// - Only tiny bits hydrate (countdown/register). Everything else is server-rendered HTML.
+// MERGED app — public landing + admin CMS in ONE Astro app on Cloudflare Pages.
+//
+// - `output: 'hybrid'`: the landing pages SSR per request (they set `prerender = false`)
+//   so admin edits (KV) show up instantly and stay SEO-crawlable; the admin pages + APIs
+//   are all `prerender = false` too, so they run per-request behind the auth middleware.
+//   Nothing sensitive is statically prerendered.
+// - `platformProxy` wires the real D1/KV bindings into `astro dev` from wrangler.toml,
+//   using the SAME local state dir that `wrangler d1 execute --local` writes to — the DB
+//   we migrate + seed is the exact one dev serves against (no dual-DB drift).
+// - `security.checkOrigin`: Astro's built-in CSRF origin check on non-GET requests, on top
+//   of the __Host- same-site session cookie. Important now that the admin shares an origin
+//   with the public landing.
 export default defineConfig({
   site: 'https://hon-x.net',
   output: 'hybrid',
-  adapter: cloudflare({ imageService: 'passthrough' }),
+  adapter: cloudflare({
+    imageService: 'passthrough',
+    platformProxy: { enabled: true, persist: { path: './.wrangler/state/v3' } },
+  }),
   integrations: [react()],
+  security: {
+    checkOrigin: true,
+  },
   build: {
     inlineStylesheets: 'auto',
   },

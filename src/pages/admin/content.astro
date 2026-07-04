@@ -1,0 +1,502 @@
+---
+export const prerender = false;
+import Admin from '../../layouts/Admin.astro';
+import { CAN, type AuthedUser } from '../../lib/session';
+import { readLive, readVersion, currentLiveVersion, readDraft } from '../../lib/content-store';
+import type { D1Database } from '../../lib/db';
+
+const user = (Astro.locals as any).user as AuthedUser;
+const canEdit = CAN.editContent(user);
+const canPublish = CAN.publish(user);
+
+const env = (Astro.locals as any).runtime?.env as { CMS_DB?: D1Database; CMS_KV?: any } | undefined;
+const db = (Astro.locals as any).db as D1Database | undefined;
+let liveSnapshot: unknown = null;
+let liveVersion: number | null = null;
+let draft: { snapshot: unknown; savedBy: string; savedAt: number } | null = null;
+if (db) {
+  liveVersion = await currentLiveVersion(db);
+  liveSnapshot = await readLive(env?.CMS_KV);
+  if (!liveSnapshot && liveVersion) liveSnapshot = await readVersion(db, liveVersion);
+  draft = await readDraft(env?.CMS_KV);
+}
+// Editor opens the draft if one exists (work-in-progress), else the live snapshot.
+const initialSnapshot = draft?.snapshot ?? liveSnapshot;
+const hasDraft = !!draft;
+const draftSavedBy = draft?.savedBy ?? '';
+const draftSavedAt = draft?.savedAt ?? 0;
+---
+<Admin title="เนื้อหาเว็บ" active="content">
+  <div class="page-h">
+    <div>
+      <h1>เนื้อหาเว็บ</h1>
+      <div class="sub">กรอกในช่องได้เลย — ไม่ต้องเขียนโค้ด · กด “บันทึกร่าง” เก็บไว้ก่อน (ยังไม่ขึ้นเว็บ) · กด “เผยแพร่ขึ้นเว็บ” ถึงจะขึ้นเว็บจริง</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="lang-tabs" id="langTabs" title="สลับภาษาที่กำลังแก้">
+        <button data-lang="th" class="active">ไทย</button>
+        <button data-lang="en">อังกฤษ</button>
+      </span>
+      <button class="btn sm" id="translateBtn" disabled={!canEdit} title="ใช้ AI แปลข้อความไทยเป็นอังกฤษให้อัตโนมัติ (ช่องอังกฤษที่ยังว่าง)">✦ แปลอัตโนมัติ ไทย→อังกฤษ</button>
+      <button class="btn sm" id="copyBtn" title="คัดลอกข้อความไทยไปใส่ช่องอังกฤษที่ยังว่าง (ไม่ใช้ AI)">คัดลอก</button>
+      <button class="btn sm" id="draftBtn" disabled={!canEdit} title="เก็บงานที่แก้ไว้ ยังไม่ขึ้นเว็บจริง">บันทึกร่าง</button>
+      <button class="btn primary sm" id="publishBtn" disabled={!canPublish} title="เอาเนื้อหาขึ้นเว็บจริง">เผยแพร่ขึ้นเว็บ</button>
+    </div>
+  </div>
+
+  <!-- Draft banner: shows when a saved-but-unpublished draft is loaded. -->
+  <div class="draft-banner" id="draftBanner" style={hasDraft ? '' : 'display:none'}>
+    <span class="dot on"></span>
+    <span id="draftMsg">กำลังแก้ฉบับร่างที่ยังไม่เผยแพร่{draftSavedBy ? ` · แก้ล่าสุดโดย ${draftSavedBy}` : ''}</span>
+    <button class="btn sm danger" id="discardBtn" style="margin-left:auto">ทิ้งร่าง กลับไปใช้ตัวที่เผยแพร่</button>
+  </div>
+
+  <div class="notice ok" id="okNote" style="display:none"></div>
+  <div class="notice err" id="errNote" style="display:none"></div>
+
+  <!-- Live preview mirror: shows the hero as it will look, updating as you type. Not the
+       full page, but instant feedback for the "แก้แล้วหน้าตาเป็นไง" fear (grok UX3). -->
+  <div class="preview-card" id="previewCard">
+    <div class="preview-head">
+      <span>ตัวอย่างหน้าเว็บ (อัปเดตตามที่พิมพ์)</span>
+      <span class="preview-lang" id="previewLangTag">ไทย</span>
+    </div>
+    <div class="preview-stage" id="previewStage">
+      <div class="pv-kicker" id="pvKicker"></div>
+      <div class="pv-headline" id="pvHeadline"></div>
+      <div class="pv-headline2" id="pvHeadline2"></div>
+      <div class="pv-subhead" id="pvSubhead"></div>
+      <div class="pv-ctas">
+        <span class="pv-cta pv-cta--1" id="pvCta1"></span>
+        <span class="pv-cta pv-cta--2" id="pvCta2"></span>
+      </div>
+      <div class="pv-count" id="pvCount"></div>
+    </div>
+  </div>
+
+  <div id="editor" class="empty">กำลังโหลด…</div>
+
+  <script define:vars={{ initialSnapshot, liveVersion, canEdit, canPublish, hasDraft, draftSavedBy, draftSavedAt }}>
+    let snapshot = initialSnapshot;
+    let lang = 'th';
+
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const get = (o, p) => p.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
+    const setP = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); const t = ks.reduce((x, k) => (x[k] = x[k] || {}), o); t[last] = v; };
+
+    // ── field renderers (each guarantees valid syntax; user never types raw json/date/url) ──
+    const LANG_TH = { th: 'ภาษาไทย', en: 'ภาษาอังกฤษ' };
+    function locField(path, label, area, hint) {
+      const v = get(snapshot, path) || {};
+      const cur = lang === 'th' ? v.th : v.en;
+      const id = 'f-' + path.replace(/\./g, '-');
+      const ph = lang === 'en' ? ' placeholder="พิมพ์ภาษาอังกฤษ (กด “คัดลอก ไทย→อังกฤษ” ช่วยได้)"' : '';
+      const input = area
+        ? `<textarea id="${id}" data-path="${path}" data-kind="loc"${ph}>${esc(cur)}</textarea>`
+        : `<input id="${id}" data-path="${path}" data-kind="loc"${ph} value="${esc(cur)}">`;
+      return `<div class="field"><label>${label} <span style="color:var(--txt-faint)">· ${LANG_TH[lang]}</span></label>${input}${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+    }
+    function urlField(path, label, hint) {
+      const id = 'f-' + path.replace(/\./g, '-');
+      return `<div class="field"><label>${label}</label>
+        <input id="${id}" class="mono" data-path="${path}" data-kind="url" value="${esc(get(snapshot, path))}" placeholder="วางลิงก์ที่นี่ เช่น https://discord.gg/…">
+        <div class="hint">${hint || 'วางลิงก์ได้เลย ระบบเติม https:// ให้อัตโนมัติ · ลิงก์ภายในหน้า เช่น #war ก็ใช้ได้'}</div></div>`;
+    }
+    function dateField(path, label) {
+      const id = 'f-' + path.replace(/\./g, '-');
+      // convert stored ISO to the datetime-local value (local wall time) for the picker
+      let val = '';
+      const iso = get(snapshot, path);
+      if (iso) { const d = new Date(iso); if (!isNaN(d)) val = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
+      return `<div class="field"><label>${label}</label>
+        <input id="${id}" type="datetime-local" data-path="${path}" data-kind="date" value="${val}">
+        <div class="hint">เลือกวันและเวลา (นาฬิกานับถอยหลังจะนับไปถึงเวลานี้)</div></div>`;
+    }
+    // A plain (non-localized) single-language string — short Latin tokens like eyebrow / metric.
+    function plainField(path, label, hint) {
+      const id = 'f-' + path.replace(/\./g, '-');
+      return `<div class="field"><label>${label}</label>
+        <input id="${id}" data-path="${path}" data-kind="plain" value="${esc(get(snapshot, path))}">
+        ${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+    }
+    // Read-only brand swatch — faction colour / crest are locked constants (grok: 20-yr identity,
+    // not content). Shown so the editor SEES the value, but it cannot be changed here.
+    function swatchField(label, color, sub) {
+      return `<div class="field"><label>${label} <span style="color:var(--txt-faint)">· สีประจำฝ่าย (แก้ไม่ได้)</span></label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:20px;height:20px;border-radius:4px;border:1px solid var(--line);background:${esc(color)};flex:0 0 auto"></span>
+          <span class="mono" style="color:var(--txt-dim)">${esc(color)}</span>
+        </div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
+    }
+
+    // ── repeatable list editor (FAQ / roadmap) — add / remove / reorder, no index juggling ──
+    function listSection(path, title, cols, addLabel) {
+      const arr = get(snapshot, path) || [];
+      let rows = arr.map((_, i) => listRow(path, i, cols)).join('');
+      return `<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2 style="margin:0">${title}</h2>
+          <button class="btn sm" data-add="${path}" data-cols='${JSON.stringify(cols)}'>+ ${addLabel}</button>
+        </div>
+        <div id="list-${path}" data-list="${path}">${rows || '<div class="empty">ยังไม่มีรายการ — กดปุ่ม “+ ' + addLabel + '” เพื่อเพิ่ม</div>'}</div>
+      </div>`;
+    }
+    function listRow(path, i, cols) {
+      const inner = cols.map((c) => {
+        const p = `${path}.${i}.${c.key}`;
+        if (c.kind === 'loc') return locField(p, c.label, c.area);
+        if (c.kind === 'plain') return plainField(p, c.label, c.hint);
+        return urlField(p, c.label);
+      }).join('');
+      return `<div class="row-item" data-row="${path}:${i}" draggable="true" style="border:1px solid var(--line);border-top-color:var(--line-top);border-radius:var(--r);padding:12px 12px 4px;margin-bottom:8px;background:var(--input)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span class="pill data" style="cursor:grab">⋮⋮ #${i + 1}</span>
+          <span>
+            <button class="btn sm" data-move="${path}:${i}:up" title="เลื่อนขึ้น">↑</button>
+            <button class="btn sm" data-move="${path}:${i}:down" title="เลื่อนลง">↓</button>
+            <button class="btn sm danger" data-del="${path}:${i}" title="ลบรายการนี้">ลบ</button>
+          </span>
+        </div>${inner}</div>`;
+    }
+
+    function render() {
+      const root = document.getElementById('editor');
+      if (!snapshot) { root.textContent = 'ยังไม่มีเนื้อหา'; return; }
+      let html = '';
+
+      // ── ช่วงเปิดเกม + ส่วนที่แสดง ──
+      const PHASE_TH = { cbt: 'ทดสอบวงปิด (CBT)', obt: 'ทดสอบวงเปิด (OBT)', launch: 'เปิดเต็มตัว (Launch)' };
+      const SECTION_TH = {
+        hero: 'ส่วนหัว (โลโก้ + ปุ่ม)', serverOath: 'คำสัญญาเซิร์ฟไทย', war: 'สงคราม & ฝ่าย',
+        register: 'ชวนสมัคร', roadmap: 'โรดแมป', faq: 'คำถามพบบ่อย', media: 'วิดีโอ/ภาพ', patchNotes: 'อัปเดตแพตช์',
+      };
+      html += `<div class="panel"><h2>ช่วงเปิดเกม & ส่วนที่แสดง</h2>
+        <div class="field"><label>ตอนนี้อยู่ช่วงไหน</label>
+          <select id="f-phase">${['cbt', 'obt', 'launch'].map((p) => `<option value="${p}" ${snapshot.phase === p ? 'selected' : ''}>${PHASE_TH[p]}</option>`).join('')}</select>
+          <div class="hint">เลือกช่วงของเกม — หน้าเว็บจะปรับข้อความหัวให้ตรงช่วงนี้อัตโนมัติ</div></div>
+        <label>ส่วนที่แสดงบนเว็บ <span style="color:var(--txt-faint)">· ติ๊กเพื่อเปิด/ปิดแต่ละส่วน</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:6px">
+          ${Object.keys(snapshot.sections || {}).map((k) => `<label style="display:flex;gap:6px;align-items:center;color:var(--txt-dim)"><input type="checkbox" data-section="${k}" ${snapshot.sections[k] ? 'checked' : ''} style="width:auto"> ${SECTION_TH[k] || k}</label>`).join('')}
+        </div></div>`;
+
+      // ── ส่วนหัว (Hero) ──
+      html += `<div class="panel"><h2>ส่วนหัวของหน้า</h2>
+        ${locField('hero.kicker', 'ข้อความนำ (บรรทัดเล็กเหนือหัวข้อ)', false, 'ตัวอย่าง: HEROES OF NEWERTH')}
+        ${locField('hero.headline', 'หัวข้อใหญ่', false, 'ตัวอย่าง: ตำนานหวนคืน')}
+        ${locField('hero.headline2', 'หัวข้อบรรทัดที่ 2', false, 'ต่อจากบรรทัดแรก เช่น: สู่เซิร์ฟไทยแท้')}
+        ${locField('hero.subhead', 'คำโปรยใต้หัวข้อ', true)}
+        ${locField('hero.ctaPrimary.label', 'ข้อความปุ่มหลัก', false, 'ตัวอย่าง: เข้าร่วม Discord')}
+        ${urlField('hero.ctaPrimary.href', 'ลิงก์ปุ่มหลัก')}
+        ${locField('hero.ctaSecondary.label', 'ข้อความปุ่มรอง', false, 'ตัวอย่าง: ดูตัวอย่างเกม')}
+        ${urlField('hero.ctaSecondary.href', 'ลิงก์ปุ่มรอง')}
+        ${dateField('hero.countdownTo', 'เวลาที่นาฬิกานับถอยหลังไปถึง')}
+        ${locField('hero.countdownLabel', 'ข้อความเหนือนาฬิกา', false, 'ตัวอย่าง: ประตูเปิดใน')}</div>`;
+
+      // ── คำถามพบบ่อย ──
+      html += listSection('faq', 'คำถามพบบ่อย (FAQ)', [
+        { key: 'q', label: 'คำถาม', kind: 'loc' },
+        { key: 'a', label: 'คำตอบ', kind: 'loc', area: true },
+      ], 'เพิ่มคำถาม');
+
+      // ── โรดแมป ──
+      html += listSection('roadmap.stages', 'โรดแมป (ขั้นตอนของเกม)', [
+        { key: 'label', label: 'ชื่อขั้น', kind: 'loc' },
+      ], 'เพิ่มขั้น');
+      const active = get(snapshot, 'roadmap.activeStage');
+      const stages = get(snapshot, 'roadmap.stages') || [];
+      html += `<div class="panel"><h2>โรดแมป — ขั้นปัจจุบัน</h2>
+        <div class="field"><label>ตอนนี้อยู่ขั้นไหน</label>
+          <select id="f-activestage">${stages.map((s) => `<option value="${esc(s.id)}" ${s.id === active ? 'selected' : ''}>${esc((s.label && s.label.th) || s.id)}</option>`).join('')}</select>
+          <div class="hint">ขั้นที่เลือกจะถูกไฮไลต์บนเว็บ</div></div></div>`;
+
+      // ── ชวนสมัคร + ท้ายเว็บ ──
+      html += `<div class="panel"><h2>ส่วนชวนสมัคร</h2>
+        ${locField('register.heading', 'หัวข้อ', false, 'ตัวอย่าง: เข้าร่วม Closed Beta')}
+        ${locField('register.body', 'คำอธิบาย', true)}
+        ${locField('register.cta.label', 'ข้อความปุ่ม', false, 'ตัวอย่าง: เข้าร่วม Discord')}
+        ${urlField('register.cta.href', 'ลิงก์ปุ่ม')}</div>`;
+      html += `<div class="panel"><h2>ท้ายเว็บ (Footer)</h2>${locField('footer.note', 'ข้อความท้ายเว็บ', false, 'ตัวอย่าง: HoN X — สร้างโดยแฟนเพื่อแฟน')}</div>`;
+
+      // ── คำสัญญาเซิร์ฟไทย ──
+      html += `<div class="panel"><h2>คำสัญญาเซิร์ฟไทย</h2>
+        ${plainField('serverOath.eyebrow', 'ข้อความนำ (บรรทัดเล็กบนหัวข้อ)', 'ตัวอย่าง: THE SERVER OATH')}
+        ${locField('serverOath.title', 'หัวข้อ', false, 'ตัวอย่าง: คำสาบานของเซิร์ฟไทย')}
+        ${locField('serverOath.intro', 'คำนำ', true)}</div>`;
+      html += listSection('serverOath.proofs', 'คำสัญญาเซิร์ฟไทย — ข้อพิสูจน์', [
+        { key: 'title', label: 'หัวข้อข้อพิสูจน์', kind: 'loc' },
+        { key: 'body', label: 'รายละเอียด', kind: 'loc', area: true },
+        { key: 'metric', label: 'ป้ายสั้น (มุมขวา)', kind: 'plain', hint: 'ป้ายภาษาอังกฤษสั้น ๆ เช่น TH region-locked' },
+      ], 'เพิ่มข้อพิสูจน์');
+
+      // ── สงคราม (หัวส่วน) ──
+      html += `<div class="panel"><h2>สงคราม (หัวส่วน)</h2>
+        ${plainField('war.eyebrow', 'ข้อความนำ (บรรทัดเล็ก)', 'ตัวอย่าง: THE WAR')}
+        ${locField('war.title', 'หัวข้อ', false, 'ตัวอย่าง: สงครามที่ Newerth รอคุณอยู่')}
+        ${locField('war.subtitle', 'คำโปรย', true)}
+        ${locField('war.factionsLabel', 'ป้ายบรรทัด — เลือกฝ่าย', false, 'ตัวอย่าง: เลือกฝ่าย')}
+        ${locField('war.spotlightLabel', 'ป้ายบรรทัด — วิดีโอ', false, 'ตัวอย่าง: ชมสนามรบ')}</div>`;
+
+      // ── ฝ่าย (Legion/Hellbourne) — แก้ข้อความได้ สี/ตราล็อก (grok) ──
+      const facSide = (side, name) => {
+        const f = get(snapshot, 'factions.' + side) || {};
+        return `<h3 style="margin:14px 0 8px;color:var(--txt-dim)">ฝ่าย ${name}</h3>
+          ${plainField('factions.' + side + '.name', 'ชื่อฝ่าย')}
+          ${plainField('factions.' + side + '.tagline', 'คำโปรยสั้น', 'บรรทัดสั้นภาษาอังกฤษ เช่น Order · Nature · Light')}
+          ${locField('factions.' + side + '.lore', 'เรื่องราวของฝ่าย', true)}
+          ${swatchField('สี Accent', f.accent, 'สีประจำฝ่าย — เป็นเอกลักษณ์ ล็อกไว้ แก้ไม่ได้')}
+          ${swatchField('สีเรืองแสง', f.glow)}
+          <div class="field"><label>ตราสัญลักษณ์ <span style="color:var(--txt-faint)">· ล็อกไว้</span></label>
+            <div class="mono" style="color:var(--txt-dim)">${esc(f.crest)}</div></div>`;
+      };
+      html += `<div class="panel"><h2>สองฝ่าย (Legion / Hellbourne)</h2>
+        ${locField('factions.title', 'หัวข้อส่วน', false, 'ตัวอย่าง: สองขั้วแห่งสงคราม')}
+        ${locField('factions.hint', 'บรรทัดคำใบ้', false, 'ตัวอย่าง: เลือกฝ่ายของคุณ')}
+        ${facSide('legion', 'Legion')}
+        ${facSide('hellbourne', 'Hellbourne')}</div>`;
+
+      // ── วิดีโอ/ภาพ ──
+      html += `<div class="panel"><h2>วิดีโอ & ภาพสนามรบ</h2>
+        ${locField('media.title', 'หัวข้อ', false, 'ตัวอย่าง: ชมสนามรบ')}
+        ${locField('media.subtitle', 'คำโปรย', true)}
+        ${plainField('media.label', 'ป้ายมุมภาพ', 'ป้ายสั้น เช่น Highlight')}
+        ${locField('media.reel.heading', 'หัวข้อคลิปไฮไลต์')}
+        ${locField('media.reel.caption', 'คำบรรยายคลิป', true)}</div>`;
+      html += listSection('media.scenes', 'วิดีโอ/ภาพ — ภาพประกอบ', [
+        { key: 'image', label: 'ที่อยู่ไฟล์ภาพ', kind: 'url', hint: 'พาธไฟล์ภาพ เช่น /art/scene-bastion' },
+        { key: 'heading', label: 'หัวข้อภาพ', kind: 'loc' },
+        { key: 'caption', label: 'คำบรรยายภาพ', kind: 'loc', area: true },
+      ], 'เพิ่มภาพ');
+
+      // ── เมนูด้านบน (Navbar) ──
+      if (snapshot.nav) {
+        html += listSection('nav.links', 'เมนูด้านบน', [
+          { key: 'label', label: 'ชื่อเมนู', kind: 'loc' },
+          { key: 'href', label: 'ลิงก์', kind: 'url', hint: 'เช่น #/ หรือ #/download' },
+        ], 'เพิ่มเมนู');
+        html += `<div class="panel"><h2>เมนู — ปุ่มสมาชิก</h2>
+          ${locField('nav.member.label', 'ชื่อปุ่มสมาชิก', false, 'ตัวอย่าง: หน้าสมาชิก')}
+          ${urlField('nav.member.href', 'ลิงก์ปุ่มสมาชิก', 'ปกติคือ #/member')}</div>`;
+      }
+
+      // ── หน้าดาวน์โหลด ──
+      if (snapshot.download) {
+        html += `<div class="panel"><h2>หน้าดาวน์โหลด</h2>
+          ${plainField('download.eyebrow', 'ข้อความนำ (บรรทัดเล็ก)', 'ตัวอย่าง: THE ARMORY')}
+          ${locField('download.title', 'หัวข้อ', false, 'ตัวอย่าง: ดาวน์โหลดตัวเกม')}
+          ${locField('download.subtitle', 'คำโปรย', true)}
+          ${locField('download.seoTitle', 'หัวข้อ SEO (ตอนค้นเจอ)')}
+          ${locField('download.seoDescription', 'คำอธิบาย SEO', true)}
+          <h3 style="margin:14px 0 8px;color:var(--txt-dim)">ตัวเกม</h3>
+          ${plainField('download.client.name', 'ชื่อไคลเอนต์', 'เช่น HoN X Client')}
+          ${plainField('download.client.platform', 'ระบบที่รองรับ', 'เช่น Windows 10 / 11 (64-bit)')}
+          ${locField('download.client.version', 'เวอร์ชัน', false, 'เช่น Closed Beta')}
+          ${plainField('download.client.size', 'ขนาดไฟล์', 'เช่น ~7 GB')}
+          ${locField('download.client.buttonLabel', 'ข้อความปุ่มดาวน์โหลด')}
+          ${urlField('download.client.href', 'ลิงก์ดาวน์โหลด')}
+          ${locField('download.client.lockedNote', 'ข้อความช่วงยังไม่เปิดโหลด', true)}
+          ${locField('download.client.lockedCountdownLabel', 'ป้ายนับถอยหลังก่อนเปิดโหลด', false, 'เช่น โหลดได้ในอีก')}
+          ${locField('download.client.mirrorLabel', 'ป้ายลิงก์สำรอง', false, 'เช่น ลิงก์สำรอง')}</div>`;
+        html += listSection('download.client.mirrors', 'ดาวน์โหลด — ลิงก์สำรอง', [
+          { key: 'label', label: 'ชื่อลิงก์', kind: 'plain' },
+          { key: 'href', label: 'ลิงก์', kind: 'url' },
+        ], 'เพิ่มลิงก์สำรอง');
+        html += `<div class="panel"><h2>ดาวน์โหลด — หัวข้อวิธีติดตั้ง</h2>${locField('download.steps.title', 'หัวข้อ', false, 'เช่น วิธีติดตั้ง')}</div>`;
+        html += listSection('download.steps.items', 'ดาวน์โหลด — ขั้นตอนติดตั้ง', [
+          { key: 'title', label: 'หัวข้อขั้นตอน', kind: 'loc' },
+          { key: 'body', label: 'รายละเอียด', kind: 'loc', area: true },
+        ], 'เพิ่มขั้นตอน');
+        html += `<div class="panel"><h2>ดาวน์โหลด — หัวตารางสเปก</h2>
+          ${locField('download.specs.title', 'หัวข้อ', false, 'เช่น สเปกเครื่อง')}
+          ${locField('download.specs.minLabel', 'ป้ายขั้นต่ำ', false, 'เช่น ขั้นต่ำ')}
+          ${locField('download.specs.recLabel', 'ป้ายแนะนำ', false, 'เช่น แนะนำ')}</div>`;
+        html += listSection('download.specs.rows', 'ดาวน์โหลด — แถวสเปก', [
+          { key: 'part', label: 'ส่วนประกอบ', kind: 'loc' },
+          { key: 'min', label: 'ขั้นต่ำ', kind: 'loc' },
+          { key: 'rec', label: 'แนะนำ', kind: 'loc' },
+        ], 'เพิ่มแถวสเปก');
+      }
+
+      // ── หน้าสมาชิก ──
+      if (snapshot.member) {
+        html += `<div class="panel"><h2>หน้าสมาชิก</h2>
+          ${plainField('member.eyebrow', 'ข้อความนำ (บรรทัดเล็ก)', 'ตัวอย่าง: THE GARRISON')}
+          ${locField('member.title', 'หัวข้อ', false, 'ตัวอย่าง: หน้าสมาชิก')}
+          ${locField('member.subtitle', 'คำโปรย', true)}
+          ${locField('member.seoTitle', 'หัวข้อ SEO (ตอนค้นเจอ)')}
+          ${locField('member.seoDescription', 'คำอธิบาย SEO', true)}
+          ${locField('member.loginLabel', 'ข้อความปุ่มเข้าสู่ระบบ')}
+          ${locField('member.registerLabel', 'ข้อความปุ่มสมัคร')}
+          ${urlField('member.portalUrl', 'ลิงก์พอร์ทัลสมาชิก')}
+          ${urlField('member.loginUrl', 'ลิงก์เข้าสู่ระบบ (เว้นว่าง = ยังไม่เปิด)')}
+          ${urlField('member.registerUrl', 'ลิงก์สมัคร (เว้นว่าง = ยังไม่เปิด)')}
+          ${locField('member.comingSoonNote', 'ข้อความช่วงยังไม่เปิดระบบบัญชี', true)}
+          ${locField('member.discordButtonLabel', 'ข้อความปุ่ม Discord')}</div>`;
+        html += listSection('member.features', 'สมาชิก — ฟีเจอร์', [
+          { key: 'title', label: 'ชื่อฟีเจอร์', kind: 'loc' },
+          { key: 'body', label: 'รายละเอียด', kind: 'loc', area: true },
+          { key: 'status', label: 'สถานะ', kind: 'loc' },
+        ], 'เพิ่มฟีเจอร์');
+      }
+
+      root.innerHTML = html;
+      wire();
+      updatePreview();
+    }
+
+    function normalizeUrl(v) {
+      let s = String(v).trim();
+      if (!s) return s;
+      if (s.startsWith('#') || s.startsWith('/')) return s;      // anchors & internal paths ok
+      if (/^https?:\/\//i.test(s)) return s;
+      if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(s)) return 'https://' + s; // looks like a domain
+      return s;
+    }
+
+    // Live hero preview — mirrors what the landing hero will show, in the active language.
+    function updatePreview() {
+      const P = (p) => { const v = get(snapshot, p) || {}; return (lang === 'th' ? v.th : v.en) || v.th || ''; };
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || ''; };
+      document.getElementById('previewLangTag').textContent = lang === 'th' ? 'ไทย' : 'อังกฤษ';
+      set('pvKicker', P('hero.kicker'));
+      set('pvHeadline', P('hero.headline'));
+      set('pvHeadline2', P('hero.headline2'));
+      set('pvSubhead', P('hero.subhead'));
+      set('pvCta1', P('hero.ctaPrimary.label'));
+      set('pvCta2', P('hero.ctaSecondary.label'));
+      const cd = P('hero.countdownLabel');
+      const iso = get(snapshot, 'hero.countdownTo');
+      let when = '';
+      if (iso) { const d = new Date(iso); if (!isNaN(d)) when = d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }); }
+      set('pvCount', cd ? (when ? `${cd} · ${when}` : cd) : '');
+      // Hide CTAs that are empty so the mirror matches the real render.
+      document.getElementById('pvCta1').style.display = P('hero.ctaPrimary.label') ? '' : 'none';
+      document.getElementById('pvCta2').style.display = P('hero.ctaSecondary.label') ? '' : 'none';
+    }
+
+    function wire() {
+      document.querySelectorAll('[data-kind="loc"]').forEach((el) => el.addEventListener('input', () => {
+        const cur = get(snapshot, el.dataset.path) || {}; cur[lang] = el.value; setP(snapshot, el.dataset.path, cur);
+        if (el.dataset.path.startsWith('hero.')) updatePreview();
+      }));
+      document.querySelectorAll('[data-kind="url"]').forEach((el) => {
+        el.addEventListener('input', () => setP(snapshot, el.dataset.path, el.value));
+        el.addEventListener('blur', () => { el.value = normalizeUrl(el.value); setP(snapshot, el.dataset.path, el.value); });
+      });
+      document.querySelectorAll('[data-kind="plain"]').forEach((el) =>
+        el.addEventListener('input', () => setP(snapshot, el.dataset.path, el.value)));
+      document.querySelectorAll('[data-kind="date"]').forEach((el) => el.addEventListener('input', () => {
+        setP(snapshot, el.dataset.path, el.value ? new Date(el.value).toISOString() : '');
+        if (el.dataset.path.startsWith('hero.')) updatePreview();
+      }));
+      document.querySelectorAll('[data-section]').forEach((el) => el.addEventListener('change', () => { snapshot.sections[el.dataset.section] = el.checked; }));
+      const ph = document.getElementById('f-phase'); if (ph) ph.addEventListener('change', () => { snapshot.phase = ph.value; });
+      const as = document.getElementById('f-activestage'); if (as) as.addEventListener('change', () => { snapshot.roadmap.activeStage = as.value; });
+
+      // add / remove / move on lists
+      document.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => {
+        const path = b.dataset.add; const cols = JSON.parse(b.dataset.cols);
+        const arr = get(snapshot, path) || []; setP(snapshot, path, arr);
+        const item = {};
+        cols.forEach((c) => { if (c.kind === 'loc') item[c.key] = { th: '', en: '' }; else item[c.key] = ''; });
+        if (path === 'roadmap.stages') item.id = 'stage' + (arr.length + 1) + '-' + Math.floor(performance.now());
+        // serverOath proofs + member features auto-number their 'no' field
+        if (path === 'serverOath.proofs' || path === 'member.features') item.no = String(arr.length + 1).padStart(2, '0');
+        arr.push(item); render();
+      }));
+      document.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
+        const [path, i] = b.dataset.del.split(':'); const arr = get(snapshot, path); arr.splice(Number(i), 1); render();
+      }));
+      document.querySelectorAll('[data-move]').forEach((b) => b.addEventListener('click', () => {
+        const [path, i, dir] = b.dataset.move.split(':'); const arr = get(snapshot, path); const idx = Number(i);
+        const j = dir === 'up' ? idx - 1 : idx + 1; if (j < 0 || j >= arr.length) return;
+        [arr[idx], arr[j]] = [arr[j], arr[idx]]; render();
+      }));
+    }
+
+    document.getElementById('langTabs').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      lang = b.dataset.lang;
+      document.querySelectorAll('#langTabs button').forEach((x) => x.classList.toggle('active', x === b));
+      render();
+    });
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      const walk = (o) => { if (o && typeof o === 'object') { if (typeof o.th === 'string' && typeof o.en === 'string' && !o.en.trim()) o.en = o.th; else Object.values(o).forEach(walk); } };
+      walk(snapshot); render(); flash('ok', 'คัดลอกข้อความไทยไปใส่ช่องอังกฤษที่ว่างแล้ว (แก้เป็นอังกฤษได้ทีหลัง)');
+    });
+
+    // AI translate: collect every {th,en} where en is empty and th has text, translate in one
+    // call, write results back. Non-destructive — only fills empty English fields.
+    document.getElementById('translateBtn')?.addEventListener('click', async () => {
+      const targets = [];
+      const walk = (o) => {
+        if (!o || typeof o !== 'object') return;
+        if (typeof o.th === 'string' && typeof o.en === 'string') {
+          if (o.th.trim() && !o.en.trim()) targets.push(o);
+        } else Object.values(o).forEach(walk);
+      };
+      walk(snapshot);
+      const btn = document.getElementById('translateBtn');
+      if (targets.length === 0) { flash('ok', 'ช่องอังกฤษเต็มหมดแล้ว ไม่มีอะไรต้องแปล'); return; }
+      btn.disabled = true; btn.textContent = `กำลังแปล ${targets.length} ช่อง…`;
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ texts: targets.map((t) => t.th), context: 'HoN X — MOBA game landing page' }),
+        });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.translations)) {
+          targets.forEach((t, i) => { if (data.translations[i]) t.en = data.translations[i]; });
+          render();
+          flash('ok', `แปลเป็นอังกฤษให้ ${targets.length} ช่องแล้ว — ตรวจทานได้ที่แท็บ “อังกฤษ” ก่อนเผยแพร่`);
+        } else {
+          flash('err', data.error || 'แปลไม่สำเร็จ');
+        }
+      } catch { flash('err', 'เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง'); }
+      btn.disabled = false; btn.textContent = '✦ แปลอัตโนมัติ ไทย→อังกฤษ';
+    });
+    // Save draft — stores the working copy WITHOUT going live.
+    document.getElementById('draftBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('draftBtn'); btn.disabled = true; btn.textContent = 'กำลังบันทึก…';
+      const res = await fetch('/api/draft', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ snapshot }) });
+      const data = await res.json();
+      if (res.ok) {
+        flash('ok', 'บันทึกร่างแล้ว — เก็บไว้ก่อน ยังไม่ขึ้นเว็บจริง (กด “เผยแพร่ขึ้นเว็บ” เมื่อพร้อม)');
+        const banner = document.getElementById('draftBanner'); banner.style.display = 'flex';
+        document.getElementById('draftMsg').textContent = 'กำลังแก้ฉบับร่างที่ยังไม่เผยแพร่ · เพิ่งบันทึกเมื่อครู่';
+      } else flash('err', 'บันทึกร่างไม่สำเร็จ: ' + ((data.details ? data.details.join('; ') : data.error) || ''));
+      btn.disabled = false; btn.textContent = 'บันทึกร่าง';
+    });
+
+    // Discard draft — reload the live content, dropping the working copy.
+    document.getElementById('discardBtn')?.addEventListener('click', async () => {
+      if (!confirm('ทิ้งฉบับร่างที่แก้ไว้ แล้วกลับไปใช้เนื้อหาที่เผยแพร่อยู่ตอนนี้ ใช่ไหม?')) return;
+      const res = await fetch('/api/draft', { method: 'DELETE' });
+      if (res.ok) { flash('ok', 'ทิ้งร่างแล้ว — กำลังโหลดเนื้อหาที่เผยแพร่อยู่'); setTimeout(() => location.reload(), 800); }
+      else flash('err', 'ทิ้งร่างไม่สำเร็จ');
+    });
+
+    // Publish — goes LIVE. Confirm first (grok: the scariest button gets a guard).
+    document.getElementById('publishBtn')?.addEventListener('click', async () => {
+      if (!confirm('เผยแพร่เนื้อหานี้ขึ้นเว็บจริงเลยใช่ไหม?\n\nคนทั่วไปจะเห็นทันที (ถ้าไม่พอใจ ย้อนกลับได้ที่หน้า “ประวัติ & ย้อนกลับ”)')) return;
+      const btn = document.getElementById('publishBtn'); btn.disabled = true; btn.textContent = 'กำลังเผยแพร่…';
+      const res = await fetch('/api/publish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ snapshot, note: 'แก้ไขผ่านแอดมิน', baseVersion: liveVersion }) });
+      const data = await res.json();
+      if (res.ok) {
+        flash('ok', `เผยแพร่ขึ้นเว็บแล้ว (เวอร์ชัน ${data.version}) — ขึ้นเว็บจริงเรียบร้อย`);
+        document.getElementById('draftBanner').style.display = 'none'; // draft cleared server-side
+      } else flash('err', 'เผยแพร่ไม่สำเร็จ: ' + ((data.details ? data.details.join('; ') : data.error) || ''));
+      btn.disabled = false; btn.textContent = 'เผยแพร่ขึ้นเว็บ';
+    });
+    function flash(kind, msg) {
+      const ok = document.getElementById('okNote'), err = document.getElementById('errNote');
+      ok.style.display = 'none'; err.style.display = 'none';
+      const el = kind === 'ok' ? ok : err; el.textContent = msg; el.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function load() {
+      if (!snapshot) { const res = await fetch('/api/content'); snapshot = (await res.json()).snapshot; }
+      render();
+    }
+    load();
+  </script>
+</Admin>

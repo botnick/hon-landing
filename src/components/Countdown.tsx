@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 
 /** Live countdown island. Only this tiny component ships JS — the rest is static. */
-export default function Countdown({ to, label }: { to: string; label?: string }) {
+export default function Countdown({ to, label, locale = 'th' }: { to: string; label?: string; locale?: 'th' | 'en' }) {
   const target = to ? new Date(to).getTime() : 0;
   const [now, setNow] = useState<number | null>(null);
+  const t = locale === 'en'
+    ? { d: 'days', h: 'hrs', m: 'min', s: 'sec', done: 'Open now' }
+    : { d: 'วัน', h: 'ชม.', m: 'นาที', s: 'วินาที', done: 'เปิดแล้ว' };
 
   useEffect(() => {
     if (!target) return;
@@ -34,16 +37,16 @@ export default function Countdown({ to, label }: { to: string; label?: string })
 
   return (
     <div className="cd" role="timer" aria-label={label}>
-      {label && <div className="cd-label">{done ? 'เปิดแล้ว' : label}</div>}
+      {label && <div className="cd-label">{done ? t.done : label}</div>}
       {!done && (
         <div className="cd-grid">
-          {cell(d, 'วัน')}
+          {cell(d, t.d)}
           <span className="cd-sep">:</span>
-          {cell(h, 'ชม.')}
+          {cell(h, t.h)}
           <span className="cd-sep">:</span>
-          {cell(m, 'นาที')}
+          {cell(m, t.m)}
           <span className="cd-sep">:</span>
-          {cell(s, 'วินาที')}
+          {cell(s, t.s)}
         </div>
       )}
     </div>

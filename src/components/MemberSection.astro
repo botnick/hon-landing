@@ -1,7 +1,7 @@
 ---
-import { getMember, getSocial, fallbackContent } from '../lib/content';
+import { getMember, getSocial, type LocalizedContent } from '../lib/content';
 
-const { content = fallbackContent } = Astro.props;
+const { content } = Astro.props as { content: LocalizedContent };
 const m = getMember(content);
 const social = getSocial(content);
 

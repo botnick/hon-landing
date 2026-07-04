@@ -1,0 +1,83 @@
+---
+export const prerender = false;
+import Admin from '../../layouts/Admin.astro';
+import type { D1Database } from '../../lib/db';
+import type { AuthedUser } from '../../lib/session';
+
+const db = (Astro.locals as any).db as D1Database | undefined;
+const user = (Astro.locals as any).user as AuthedUser;
+
+// Real stats from D1 (no fake numbers).
+let userCount = 0, versionCount = 0, liveVersion: number | null = null, lastPublish = '';
+let recentAudit: { at: number; actor_email: string; action: string; target: string }[] = [];
+if (db) {
+  userCount = (await db.prepare('SELECT COUNT(*) AS c FROM users').first<{ c: number }>())?.c ?? 0;
+  versionCount = (await db.prepare('SELECT COUNT(*) AS c FROM content_versions').first<{ c: number }>())?.c ?? 0;
+  const lp = await db.prepare('SELECT version, published_at FROM live_pointer WHERE id=1').first<{ version: number; published_at: number }>();
+  liveVersion = lp?.version ?? null;
+  if (lp?.published_at) lastPublish = new Date(lp.published_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  recentAudit = (await db.prepare('SELECT at, actor_email, action, target FROM audit_log ORDER BY at DESC LIMIT 6').all()).results as any;
+}
+
+function ago(ms: number) {
+  const d = Date.now() - ms; const m = Math.floor(d / 60000);
+  if (m < 1) return 'เมื่อครู่';
+  if (m < 60) return `${m} นาทีที่แล้ว`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} ชั่วโมงที่แล้ว`;
+  return `${Math.floor(h / 24)} วันที่แล้ว`;
+}
+const ACTION_TH: Record<string, string> = {
+  login: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', login_failed: 'เข้าระบบไม่สำเร็จ',
+  publish: 'เผยแพร่เนื้อหา', rollback: 'ย้อนกลับเวอร์ชัน',
+  user_create: 'เพิ่มผู้ใช้', user_update: 'แก้ไขผู้ใช้', user_delete: 'ลบผู้ใช้',
+  user_disable: 'ปิดใช้งานผู้ใช้', user_enable: 'เปิดใช้งานผู้ใช้', password_reset: 'ตั้งรหัสผ่านใหม่',
+  password_change: 'เปลี่ยนรหัสผ่าน', publish_rejected: 'เผยแพร่ถูกปฏิเสธ',
+};
+const actionTh = (a: string) => ACTION_TH[a] ?? a;
+
+const liveLabel = liveVersion !== null ? `เวอร์ชัน ${liveVersion}` : '—';
+const publishLine = liveVersion !== null
+  ? `ตอนนี้เว็บใช้${liveLabel} · เผยแพร่ล่าสุด ${lastPublish || '—'}`
+  : 'ยังไม่มีเนื้อหาเผยแพร่ — ไปที่ “เนื้อหาเว็บ” เพื่อสร้างเวอร์ชันแรก';
+const hasAudit = recentAudit.length > 0;
+---
+<Admin title="หน้าหลัก" active="dashboard">
+  <div class="page-h">
+    <div>
+      <h1>หน้าหลัก</h1>
+      <div class="sub">ยินดีต้อนรับ, {user.name || user.email}</div>
+    </div>
+  </div>
+
+  <div class="grid c3">
+    <div class="stat"><div class="k">เว็บตอนนี้</div><div class="v gold">{liveLabel}</div></div>
+    <div class="stat"><div class="k">จำนวนเวอร์ชันทั้งหมด</div><div class="v">{versionCount}</div></div>
+    <div class="stat"><div class="k">ผู้ใช้งานระบบ</div><div class="v emerald">{userCount}</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>สถานะการเผยแพร่</h2>
+    <p style="margin:0;color:#8592a1">{publishLine}</p>
+  </div>
+
+  <div class="panel">
+    <h2>กิจกรรมล่าสุด</h2>
+    <p style="margin:0;color:#5a6675" hidden={hasAudit}>ยังไม่มีกิจกรรม</p>
+    <table hidden={!hasAudit}>
+      <thead>
+        <tr><th>เมื่อไหร่</th><th>ใคร</th><th>ทำอะไร</th><th>กับอะไร</th></tr>
+      </thead>
+      <tbody>
+        {recentAudit.map((r) => (
+          <tr>
+            <td style="color:#5a6675">{ago(r.at)}</td>
+            <td>{r.actor_email || '—'}</td>
+            <td><span class="pill">{actionTh(r.action)}</span></td>
+            <td style="color:#8592a1">{r.target || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Admin>

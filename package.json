@@ -1,5 +1,5 @@
 {
-  "name": "hon-x-web",
+  "name": "hon-landing",
   "type": "module",
   "version": "0.1.0",
   "private": true,
@@ -7,7 +7,10 @@
     "dev": "astro dev --host --port 4330",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "db:migrate": "wrangler d1 execute hon-x-cms --local --file=./migrations/0001_init.sql && wrangler d1 execute hon-x-cms --local --file=./migrations/0002_app_settings.sql",
+    "seed:content": "node scripts/seed-content.mjs",
+    "test": "node test/contract.test.mjs"
   },
   "dependencies": {
     "astro": "^4.16.18",
@@ -18,6 +21,7 @@
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1"
+    "@types/react-dom": "^18.3.1",
+    "wrangler": "^4.107.0"
   }
 }

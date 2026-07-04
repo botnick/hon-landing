@@ -1,0 +1,70 @@
+---
+export const prerender = false;
+import '../styles/admin.css';
+// Middleware already redirects authed users to /admin.
+const next = Astro.url.searchParams.get('next') ?? '';
+---
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>เข้าสู่ระบบ · HoN X CMS</title>
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" id="loginForm">
+      <div class="brand"><img class="mark" src="/brand/logo.webp" width="34" height="36" alt="HoN X" /><b>HoN X&nbsp;CMS</b></div>
+      <h1>เข้าสู่ระบบ</h1>
+      <p class="tag">ระบบจัดการเนื้อหาเว็บ HoN X</p>
+      <div class="notice err" id="err" style="display:none"></div>
+      <div class="field">
+        <label for="email">อีเมล</label>
+        <input id="email" name="email" type="email" autocomplete="username" required autofocus />
+      </div>
+      <div class="field">
+        <label for="password">รหัสผ่าน</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button class="btn primary" type="submit" id="submit" style="width:100%;justify-content:center">
+        เข้าสู่ระบบ
+      </button>
+    </form>
+  </div>
+
+  <script define:vars={{ next }}>
+    const form = document.getElementById('loginForm');
+    const err = document.getElementById('err');
+    const btn = document.getElementById('submit');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'กำลังเข้าสู่ระบบ…';
+      try {
+        const url = next ? `/api/login?next=${encodeURIComponent(next)}` : '/api/login';
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            email: form.email.value,
+            password: form.password.value,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.redirect) {
+          window.location.href = data.redirect;
+          return;
+        }
+        err.textContent = data.error || 'เข้าสู่ระบบไม่สำเร็จ — ตรวจอีเมลและรหัสผ่านอีกครั้ง';
+        err.style.display = 'block';
+      } catch {
+        err.textContent = 'เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง';
+        err.style.display = 'block';
+      }
+      btn.disabled = false;
+      btn.textContent = 'เข้าสู่ระบบ';
+    });
+  </script>
+</body>
+</html>

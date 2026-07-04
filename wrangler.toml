@@ -1,32 +1,31 @@
-# Cloudflare Pages config for hon-x-web.
+# hon-landing — MERGED Cloudflare Pages app (public landing + admin CMS).
 #
-# Bindings can be set EITHER here (committed, IDs are not secret) OR in the
-# Pages dashboard (Settings → Functions → Bindings). If you use the dashboard,
-# you can ignore the [[kv_namespaces]] / [[d1_databases]] blocks below.
+# ONE worker serves both: the public landing (reads content) and the admin CMS
+# (writes it). They share ONE D1 (CMS_DB) + ONE KV (CMS_KV).
 #
-# ADMIN_KEY / CF_API_TOKEN are SECRETS — never put them here. Set them with:
-#   wrangler pages secret put ADMIN_KEY
-#   wrangler pages secret put CF_API_TOKEN
-# or in the dashboard as encrypted environment variables.
+# LOCAL DEV: `pnpm dev` (astro) wires these bindings via astro.config platformProxy,
+# using the SAME .wrangler/state dir that `wrangler d1 execute --local` writes to.
+# The ids below are local placeholders — only consulted for --remote operations.
+# See README "Deploy" for creating real D1/KV and wiring their ids.
+#
+# SECRETS (never commit): SESSION_SECRET, CF_API_TOKEN, TRANSLATE_API_KEY — set with
+#   wrangler pages secret put SESSION_SECRET   (etc.)
 
-name = "hon-x-web"
+name = "hon-landing"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Live content store (read by src/lib/content.ts). Fill in your namespace id.
-# Create it with:  wrangler kv namespace create SITE_KV
-# [[kv_namespaces]]
-# binding = "SITE_KV"
-# id = "<your-kv-namespace-id>"
+# Version-history + RBAC + settings store (admin writes, landing needs it present).
+[[d1_databases]]
+binding = "CMS_DB"
+database_name = "hon-x-cms"
+database_id = "local-placeholder-replace-on-deploy"
 
-# Version history for /api/publish. Fill in your database id.
-# Create it with:  wrangler d1 create hon-x-db
-# [[d1_databases]]
-# binding = "SITE_DB"
-# database_name = "hon-x-db"
-# database_id = "<your-d1-database-id>"
+# Live content snapshot: admin WRITES site:live, landing READS it. Same namespace.
+[[kv_namespaces]]
+binding = "CMS_KV"
+id = "local-placeholder-replace-on-deploy"
 
-# Non-secret vars can live here; CF_ZONE_ID is optional (enables cache purge on publish).
-# [vars]
-# CF_ZONE_ID = "<your-zone-id>"
+[vars]
+COOKIE_SECURE = "true"

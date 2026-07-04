@@ -1,6 +1,6 @@
 ---
-import { getMedia, fallbackContent } from '../lib/content';
-const { content = fallbackContent } = Astro.props;
+import { getMedia, type LocalizedContent } from '../lib/content';
+const { content } = Astro.props as { content: LocalizedContent };
 const m = getMedia(content);
 const reel = (m as any).reel;
 const scenes = m.scenes ?? [];

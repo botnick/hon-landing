@@ -1,0 +1,120 @@
+---
+export const prerender = false;
+import Admin from '../../layouts/Admin.astro';
+import { CAN, type AuthedUser } from '../../lib/session';
+import { getTranslateSettingsPublic } from '../../lib/settings-store';
+import type { D1Database } from '../../lib/db';
+
+const user = (Astro.locals as any).user as AuthedUser;
+const env = (Astro.locals as any).runtime?.env as (Record<string, string | undefined> & { CMS_KV?: any; CMS_DB?: D1Database; CF_ZONE_ID?: string; CF_API_TOKEN?: string }) | undefined;
+const db = (Astro.locals as any).db as D1Database | undefined;
+const canSettings = CAN.editSettings(user);
+const kvOn = !!env?.CMS_KV;
+const purgeOn = !!(env?.CF_ZONE_ID && env?.CF_API_TOKEN);
+// AI-translation config (non-secret; hasKey never reveals the key).
+const tr = db ? await getTranslateSettingsPublic(db, env?.CMS_KV, env) : { provider: 'openrouter', baseUrl: '', model: '', hasKey: false };
+---
+<Admin title="ตั้งค่า" active="settings">
+  <div class="page-h">
+    <div>
+      <h1>ตั้งค่า</h1>
+      <div class="sub">บัญชีของคุณ และสถานะระบบ</div>
+    </div>
+  </div>
+
+  <div class="notice ok" id="okNote" style="display:none"></div>
+  <div class="notice err" id="errNote" style="display:none"></div>
+
+  <div class="panel">
+    <h2>บัญชีของคุณ</h2>
+    <div class="grid c2">
+      <div class="field"><label>อีเมล</label><input value={user.email} class="mono" disabled /></div>
+      <div class="field"><label>สิทธิ์</label><input value={user.role === 'owner' ? 'เจ้าของ' : user.role === 'editor' ? 'ผู้แก้ไข' : 'ผู้ดูอย่างเดียว'} disabled /></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>เปลี่ยนรหัสผ่าน</h2>
+    <div class="grid c2">
+      <div class="field"><label>รหัสผ่านปัจจุบัน</label><input id="cur" type="password" /></div>
+      <div class="field"><label>รหัสผ่านใหม่</label><input id="new" type="password" placeholder="อย่างน้อย 10 ตัวอักษร" /></div>
+    </div>
+    <button class="btn primary sm" id="pwBtn">เปลี่ยนรหัสผ่าน</button>
+  </div>
+
+  <div class="panel">
+    <h2>AI แปลภาษา (ไทย → อังกฤษ)</h2>
+    <p class="hint" style="margin:0 0 12px">ตั้งค่าผู้ให้บริการ AI สำหรับปุ่ม “แปลอัตโนมัติ” ในหน้าเนื้อหา — คีย์เก็บฝั่งเซิร์ฟเวอร์ ไม่ถูกส่งกลับมาแสดง</p>
+    <div class="grid c2">
+      <div class="field"><label>ผู้ให้บริการ</label>
+        <select id="tr-provider">
+          <option value="openrouter" selected={tr.provider === 'openrouter'}>OpenRouter</option>
+          <option value="maxplus" selected={tr.provider === 'maxplus'}>MaxPlus</option>
+          <option value="custom" selected={tr.provider === 'custom'}>กำหนดเอง (OpenAI-compatible)</option>
+        </select>
+        <div class="hint">OpenRouter / MaxPlus เลือกแล้วเติม Base URL + โมเดลให้อัตโนมัติ · MaxPlus ใช้คีย์ <span class="mono">ccsk-…</span> · อยากใช้ฟรี ตั้ง Base URL เป็น <span class="mono">…/free/v1</span> โมเดล <span class="mono">deepseek-v4-flash</span></div>
+      </div>
+      <div class="field"><label>โมเดล</label><input id="tr-model" class="mono" value={tr.model} placeholder="เช่น google/gemini-2.0-flash-001" /></div>
+    </div>
+    <div class="field"><label>Base URL <span style="color:var(--txt-faint)">· เว้นว่างได้ถ้าใช้ OpenRouter</span></label>
+      <input id="tr-base" class="mono" value={tr.baseUrl} placeholder="เช่น https://openrouter.ai/api/v1" /></div>
+    <div class="field"><label>API Key {tr.hasKey && <span class="pill live" style="margin-left:6px">ตั้งค่าแล้ว</span>}</label>
+      <input id="tr-key" class="mono" type="password" placeholder={tr.hasKey ? 'ใส่คีย์ใหม่เพื่อเปลี่ยน (เว้นว่าง = คงเดิม)' : 'วางคีย์ที่นี่'} />
+      <div class="hint">คีย์จะถูกเก็บอย่างปลอดภัยฝั่งเซิร์ฟเวอร์ และไม่แสดงกลับมาอีก</div></div>
+    <button class="btn primary sm" id="trSave" disabled={!canSettings}>บันทึกการตั้งค่าแปล</button>
+  </div>
+
+  <div class="panel">
+    <h2>สถานะระบบ</h2>
+    <table>
+      <tbody>
+        <tr><td>ที่เก็บเนื้อหา (KV)</td><td style="text-align:right">{kvOn ? <span class="pill live">เชื่อมต่อแล้ว</span> : <span class="pill off">ยังไม่เชื่อม</span>}</td></tr>
+        <tr><td>อัปเดตเว็บทันทีเมื่อเผยแพร่</td><td style="text-align:right">{purgeOn ? <span class="pill live">เปิดใช้งาน</span> : <span class="pill off">ยังไม่ตั้งค่า</span>}</td></tr>
+      </tbody>
+    </table>
+    <p class="hint" style="margin-top:10px">การอัปเดตเว็บทันทีต้องตั้งค่า <span class="mono">CF_ZONE_ID</span> + <span class="mono">CF_API_TOKEN</span> — ดูวิธีในไฟล์ README</p>
+  </div>
+
+  <script>
+    const okNote = document.getElementById('okNote'), errNote = document.getElementById('errNote');
+    document.getElementById('pwBtn')?.addEventListener('click', async () => {
+      okNote.style.display = 'none'; errNote.style.display = 'none';
+      const res = await fetch('/api/account', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'changepw', currentPassword: (document.getElementById('cur') as HTMLInputElement).value, newPassword: (document.getElementById('new') as HTMLInputElement).value }) });
+      const data = await res.json();
+      if (res.ok) { okNote.textContent = 'เปลี่ยนรหัสผ่านเรียบร้อย'; okNote.style.display = 'block'; (document.getElementById('cur') as HTMLInputElement).value = ''; (document.getElementById('new') as HTMLInputElement).value = ''; }
+      else { errNote.textContent = 'ไม่สำเร็จ: ' + (data.error || ''); errNote.style.display = 'block'; }
+    });
+
+    // Auto-fill sensible base URL + model when the provider changes (low-tech convenience).
+    const TR_DEFAULTS: Record<string, { base: string; model: string }> = {
+      openrouter: { base: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.0-flash-001' },
+      maxplus: { base: 'https://api.maxplus-ai.cc/v1', model: 'gpt-5.4-mini' },
+      custom: { base: '', model: '' },
+    };
+    document.getElementById('tr-provider')?.addEventListener('change', (e) => {
+      const p = (e.target as HTMLSelectElement).value;
+      const d = TR_DEFAULTS[p]; if (!d) return;
+      const base = document.getElementById('tr-base') as HTMLInputElement;
+      const model = document.getElementById('tr-model') as HTMLInputElement;
+      // Only fill empties or replace a known default — never clobber a custom value silently.
+      const knownBases = Object.values(TR_DEFAULTS).map((x) => x.base).filter(Boolean);
+      const knownModels = Object.values(TR_DEFAULTS).map((x) => x.model).filter(Boolean);
+      if (!base.value || knownBases.includes(base.value)) base.value = d.base;
+      if (!model.value || knownModels.includes(model.value)) model.value = d.model;
+    });
+
+    document.getElementById('trSave')?.addEventListener('click', async () => {
+      okNote.style.display = 'none'; errNote.style.display = 'none';
+      const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+      const payload: Record<string, string> = {
+        provider: val('tr-provider'), model: val('tr-model'), baseUrl: val('tr-base'),
+      };
+      const key = val('tr-key'); if (key) payload.apiKey = key;
+      const res = await fetch('/api/translate-settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (res.ok) { okNote.textContent = 'บันทึกการตั้งค่าแปลเรียบร้อย'; okNote.style.display = 'block'; (document.getElementById('tr-key') as HTMLInputElement).value = ''; }
+      else { errNote.textContent = 'ไม่สำเร็จ: ' + (data.error || ''); errNote.style.display = 'block'; }
+    });
+  </script>
+</Admin>

@@ -1,0 +1,80 @@
+---
+export const prerender = false;
+import Admin from '../../layouts/Admin.astro';
+import { CAN, type AuthedUser } from '../../lib/session';
+import { listVersions, currentLiveVersion } from '../../lib/content-store';
+import type { D1Database } from '../../lib/db';
+
+const user = (Astro.locals as any).user as AuthedUser;
+const canPublish = CAN.rollback(user); // rollback is owner-only (codex fix)
+const db = (Astro.locals as any).db as D1Database | undefined;
+
+let versions: any[] = [];
+let live: number | null = null;
+if (db) {
+  versions = await listVersions(db, 50);
+  live = await currentLiveVersion(db);
+}
+function when(ms: number) {
+  // Show local Thai wall time (readable) instead of raw UTC.
+  const d = new Date(ms);
+  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+const hasVersions = versions.length > 0;
+---
+<Admin title="ประวัติ & ย้อนกลับ" active="versions">
+  <div class="page-h">
+    <div>
+      <h1>ประวัติ & ย้อนกลับ</h1>
+      <div class="sub">ทุกครั้งที่เผยแพร่ ระบบเก็บไว้เป็นเวอร์ชัน — ถ้าแก้แล้วไม่พอใจ กด “ย้อนกลับ” กลับไปเวอร์ชันเดิมได้เสมอ ปลอดภัย ไม่มีอะไรหาย</div>
+    </div>
+  </div>
+
+  <div class="notice ok" id="okNote" style="display:none"></div>
+  <div class="notice err" id="errNote" style="display:none"></div>
+
+  <div class="panel">
+    <h2>เวอร์ชันที่เคยเผยแพร่</h2>
+    <p class="empty" hidden={hasVersions}>ยังไม่มีเวอร์ชัน — ไปที่ “เนื้อหาเว็บ” แล้วกดเผยแพร่ครั้งแรกเพื่อสร้างเวอร์ชัน 1</p>
+    <table hidden={!hasVersions}>
+      <thead>
+        <tr><th>เวอร์ชัน</th><th>เมื่อไหร่</th><th>โดยใคร</th><th>หมายเหตุ</th><th style="text-align:right">ย้อนกลับ</th></tr>
+      </thead>
+      <tbody>
+        {versions.map((v) => (
+          <tr>
+            <td class="data">
+              <span class="pill">เวอร์ชัน {v.version}</span>
+              {v.version === live ? <span class="pill live" style="margin-left:5px">บนเว็บตอนนี้</span> : null}
+            </td>
+            <td class="data" style="color:var(--txt-dim)">{when(v.created_at)}</td>
+            <td class="data" style="color:var(--txt-dim)">{v.author_email}</td>
+            <td style="color:var(--txt-dim);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{v.note}</td>
+            <td style="text-align:right">
+              {v.version === live
+                ? <span style="color:var(--txt-faint);font-size:12px">— ใช้อยู่ —</span>
+                : <button class="btn sm rollback" data-version={v.version} disabled={!canPublish} title="กลับไปใช้เวอร์ชันนี้">↩ ใช้เวอร์ชันนี้</button>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {!canPublish && hasVersions && <p class="hint" style="margin-top:10px">* เฉพาะเจ้าของเท่านั้นที่ย้อนกลับเวอร์ชันได้</p>}
+  </div>
+
+  <script>
+    document.querySelectorAll('.rollback').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const version = Number((btn as HTMLElement).dataset.version);
+        if (!confirm(`ย้อนกลับไปใช้เวอร์ชัน ${version} ใช่ไหม?\n\nเนื้อหาบนเว็บจะกลับไปเป็นเวอร์ชันนี้ (ของเดิมยังเก็บไว้ ย้อนกลับมาได้อีก)`)) return;
+        (btn as HTMLButtonElement).disabled = true;
+        (btn as HTMLElement).textContent = 'กำลังย้อนกลับ…';
+        const res = await fetch('/api/rollback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version }) });
+        const data = await res.json();
+        const ok = document.getElementById('okNote'), err = document.getElementById('errNote');
+        if (res.ok) { ok!.textContent = `ย้อนกลับไปเวอร์ชัน ${version} เรียบร้อย — ขึ้นเว็บจริงแล้ว`; ok!.style.display = 'block'; setTimeout(() => location.reload(), 1000); }
+        else { err!.textContent = 'ย้อนกลับไม่สำเร็จ: ' + (data.error || ''); err!.style.display = 'block'; (btn as HTMLButtonElement).disabled = false; (btn as HTMLElement).textContent = '↩ ใช้เวอร์ชันนี้'; }
+      });
+    });
+  </script>
+</Admin>

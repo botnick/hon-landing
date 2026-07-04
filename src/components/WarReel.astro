@@ -1,8 +1,8 @@
 ---
 import Factions from './Factions.astro';
 import VideoSpotlight from './VideoSpotlight.astro';
-import { getWar, fallbackContent } from '../lib/content';
-const { content = fallbackContent } = Astro.props;
+import { getWar, type LocalizedContent } from '../lib/content';
+const { content } = Astro.props as { content: LocalizedContent };
 const w = getWar(content);
 ---
 <!-- Act 3 — The War. One section, one head, two beats: choose your side

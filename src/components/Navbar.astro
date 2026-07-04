@@ -1,7 +1,7 @@
 ---
-import { getNav, getContent, fallbackContent } from '../lib/content';
+import { getNav, getContent, type LocalizedContent } from '../lib/content';
 
-const { content = fallbackContent } = Astro.props;
+const { content } = Astro.props as { content: LocalizedContent };
 const site = getContent(content);
 const nav = getNav(content);
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';

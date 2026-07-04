@@ -1,7 +1,7 @@
 ---
-import { getDownload, getPhaseContent, fallbackContent } from '../lib/content';
+import { getDownload, getPhaseContent, type LocalizedContent } from '../lib/content';
 
-const { content = fallbackContent } = Astro.props;
+const { content } = Astro.props as { content: LocalizedContent };
 const d = getDownload(content);
 const phase = getPhaseContent(content);
 

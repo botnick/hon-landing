@@ -1,15 +1,15 @@
 ---
 export const prerender = false; // SSR: read live content (KV) per request, fall back to bundled snapshot
 
-import Landing from '../components/Landing.astro';
-import { resolveContent, localize, pathForLocale } from '../lib/content';
+import Landing from '../../components/Landing.astro';
+import { resolveContent, localize, pathForLocale } from '../../lib/content';
 
-// One KV read per request (bundled fallback locally / on miss). Localized to Thai (default).
+// Same content, English locale. Layout stays identical to the Thai page.
 const snapshot = await resolveContent(Astro.locals as any);
 const site = Astro.site ?? new URL('https://hon-x.net');
-const canonical = new URL('/', site).href;
-const content = localize(snapshot, 'th', canonical);
-const altHref = new URL(pathForLocale('/', 'en'), site).href; // /en
+const canonical = new URL('/en', site).href;
+const content = localize(snapshot, 'en', canonical);
+const altHref = new URL(pathForLocale('/en', 'th'), site).href; // /
 
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
 ---

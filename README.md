@@ -1,116 +1,115 @@
-# HoN X — Web
+# HoN X — Landing + Admin CMS (one app)
 
-Landing site for **HoN X** (Heroes of Newerth revival, Thai server) — a Closed Beta teaser at [hon-x.net](https://hon-x.net).
+A single Astro app on Cloudflare Pages that serves **both**:
 
-Built as a fast, ultra-smooth, game-flavoured landing: a four-act "ritual gate" flow with a first-paint portal animation, self-hosted gameplay highlight reel, and a no-hardcode content seam so copy can be hot-reloaded from KV in production.
+- the public **landing** for [hon-x.net](https://hon-x.net) — a bilingual (Thai / English)
+  single-HTML game site with a hash router (`#/`, `#/download`, `#/member`); and
+- the **admin CMS** under `/admin` — a form-only, fully-Thai content manager (RBAC, drafts,
+  versioned publish + rollback, AI translation) that writes what the landing reads.
 
-## Stack
+They share **one KV** (`CMS_KV` — the admin writes `site:live`, the landing reads it) and
+**one D1** (`CMS_DB` — users, sessions, version history, settings). No second service, no
+cross-app plumbing.
 
-- **[Astro](https://astro.build) 4** — `output: 'hybrid'`, SSR landing per request
-- **[@astrojs/cloudflare](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)** — Cloudflare Pages/Workers adapter
-- **React islands** — only the countdown + a couple of interactive bits hydrate; the rest is server-rendered HTML
-- **IBM Plex Sans Thai** — Thai-native typography
+## How it fits together
 
-## Structure
+```
+  admin (/admin, /api)  ──writes──▶  KV site:live  ──reads──▶  landing (/, /en)
+        │                                                          │
+        └── D1: users · sessions · content_versions · audit · app_settings
+```
 
-Four acts, each data-driven:
-
-1. **The Gate** (`Hero`) — logo, headline, countdown gate-seal, Discord CTA, portal keyart
-2. **The Server Oath** (`ServerOath`) — proof rows answering real Thai-player concerns (region-locked matchmaking, low-latency Thai route, CBT stability)
-3. **The War** (`WarReel` = `Factions` + `VideoSpotlight`) — pick a side, then watch the highlight reel
-4. **The Summon** (`Register`) — join the Closed Beta via Discord
-
-### Content seam (no hardcode)
-
-All copy lives in [`src/data/site.json`](src/data/site.json). Components read it through [`src/lib/content.ts`](src/lib/content.ts), which resolves live content from a Cloudflare **KV** binding (`SITE_KV`) when present and falls back to the bundled JSON otherwise — so `astro dev` and any KV-less host work unchanged. The `/api/publish` route writes a versioned snapshot to D1 + KV and purges the edge cache for instant admin hot-reload.
-
-### Performance
-
-- AVIF/WebP everywhere via `<picture>`, PNG fallback
-- `content-visibility` + reserved dimensions below the fold (no CLS)
-- Scroll-reveal, hero parallax, and all micro-interactions animate **only** `transform`/`opacity` (GPU-composited — no layout thrash)
-- `prefers-reduced-motion` fully honored
-- The highlight reel lazy-loads and plays only while on screen
+- **Content contract** — `src/lib/content-contract.ts` is the single source of truth for the
+  snapshot shape; it validates on **both** write (publish) and read (landing), so a bad
+  snapshot can never break the live site (the landing falls back to the bundled
+  `src/data/fallback-snapshot.json`). Every field is bilingual (`{ th, en }`).
+- **i18n** — path-based: `/` = Thai (default), `/en` = English. `hreflang` th/en/x-default,
+  per-locale `<title>`/`<html lang>`/JSON-LD, and a TH/EN switch in the footer.
+- **Auth boundary** — `src/middleware.ts` guards **only** `/admin/**` and `/api/**`
+  (except `/api/login`). The public landing (`/`, `/en`, assets) is never gated.
 
 ## Develop
 
 ```bash
 pnpm install
-pnpm dev        # astro dev on :4330
-pnpm build      # production build → dist/
-pnpm preview    # preview the build
+
+# 1. create the local D1 schema (users, sessions, content_versions, audit, app_settings)
+pnpm db:migrate            # runs migrations/0001_init.sql + 0002_app_settings.sql (--local)
+
+# 2. seed the first owner account (choose your own email + password, ≥ 10 chars)
+node scripts/seed-owner.mjs admin@hon-x.net 'YourStrongPassword' 'Site Owner'
+
+# 3. seed initial content (v1) into D1 + KV
+pnpm seed:content
+
+# 4. run the app
+pnpm dev                   # → http://localhost:4330  (landing) · /admin (sign in) · /login
+
+# tests
+pnpm test                  # contract validator unit tests
 ```
+
+`astro.config.mjs` wires the D1/KV bindings into `astro dev` via `platformProxy`, pointed at
+the **same** `.wrangler/state` dir that `wrangler d1 execute --local` writes to — so the DB
+you migrate/seed is the exact one dev serves against (no dual-DB drift).
+
+## AI translation (optional)
+
+The admin's content editor has a **"✦ แปลอัตโนมัติ ไทย→อังกฤษ"** button (OpenAI-compatible:
+OpenRouter / MaxPlus / any custom endpoint). Configure it in **/admin → ตั้งค่า**: pick a
+provider (base URL + model auto-fill) and paste an API key. The key is stored **write-only**
+in KV (`translate:key`) — never in D1, never returned to the browser. It can also be set as
+the env secret `TRANSLATE_API_KEY`.
 
 ## Deploy (Cloudflare Pages)
 
-The site runs on **Cloudflare Pages** with the `@astrojs/cloudflare` adapter. The landing works with **zero bindings** — it just renders the bundled `site.json`. Bindings are only needed for the optional admin hot-reload path (KV live content + D1 history + `/api/publish`).
+1. **Create the stores** (once):
+   ```bash
+   export CLOUDFLARE_ACCOUNT_ID=<your-account-id>
+   pnpm exec wrangler d1 create hon-x-cms        # note the database_id
+   pnpm exec wrangler kv namespace create CMS_KV # note the id
+   ```
+2. **Put the ids in `wrangler.toml`** (`CMS_DB` database_id, `CMS_KV` id).
+3. **Apply migrations + seed the owner on the REMOTE db**:
+   ```bash
+   pnpm exec wrangler d1 execute hon-x-cms --remote --file=./migrations/0001_init.sql
+   pnpm exec wrangler d1 execute hon-x-cms --remote --file=./migrations/0002_app_settings.sql
+   # seed owner: run the INSERT that scripts/seed-owner.mjs prints, against --remote
+   ```
+4. **Secrets** (never commit):
+   ```bash
+   pnpm exec wrangler pages secret put SESSION_SECRET     # required — any long random string
+   pnpm exec wrangler pages secret put TRANSLATE_API_KEY  # optional — AI translation key
+   pnpm exec wrangler pages secret put CF_API_TOKEN       # optional — edge cache purge on publish
+   ```
+   Set `COOKIE_SECURE=true` (and optionally `CF_ZONE_ID`) as Pages vars.
+5. **Build + deploy**:
+   ```bash
+   pnpm build
+   pnpm exec wrangler pages deploy ./dist --project-name hon-landing
+   ```
+   Bind `CMS_DB` + `CMS_KV` in Pages → Settings → Functions → Bindings (or keep them in
+   `wrangler.toml`). Add the custom domain `hon-x.net`.
 
-There are two ways to deploy. **Option A (git-connected)** is recommended — every push to `main` auto-builds and deploys.
+## Layout
 
-### Option A — Git-connected (recommended)
-
-1. **Connect the repo.** Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → pick `botnick/hon-x-web`.
-2. **Build settings:**
-   | Field | Value |
-   |---|---|
-   | Framework preset | `Astro` |
-   | Build command | `pnpm build` |
-   | Build output directory | `dist` |
-   | Root directory | *(leave blank)* |
-3. Under **Environment variables**, add `PNPM_VERSION` = `9` (or set `NODE_VERSION` = `20`) so the build uses pnpm.
-4. **Save and Deploy.** First build takes ~1–2 min. You get a `*.pages.dev` URL.
-5. **Custom domain:** Pages project → **Custom domains** → add `hon-x.net` (and `www` if wanted). Cloudflare wires the DNS automatically when the domain is on the same account.
-
-That's it for a static-content deploy. To enable admin hot-reload, do **Bindings** below.
-
-### Option B — CLI (wrangler)
-
-```bash
-pnpm build
-pnpm dlx wrangler pages deploy dist --project-name hon-x-web
 ```
-
-First run creates the project and prompts for the production branch (`main`).
-
-### Bindings (optional — admin hot-reload)
-
-The `/api/publish` endpoint writes a versioned content snapshot to D1 + KV and flips the live pointer so edits show up within ~30s (or instantly if cache-purge is configured). Without these bindings the endpoint returns `501` and the site serves the bundled JSON — everything else works.
-
-1. **Create the stores:**
-   ```bash
-   pnpm dlx wrangler kv namespace create SITE_KV     # → note the id
-   pnpm dlx wrangler d1 create hon-x-db              # → note the database_id
-   ```
-2. **Run the D1 migration** (creates the `site_versions` table):
-   ```bash
-   pnpm dlx wrangler d1 execute hon-x-db --remote --file ./migrations/0001_site_versions.sql
-   ```
-3. **Wire the bindings** — either uncomment and fill the ids in [`wrangler.toml`](wrangler.toml), **or** add them in the dashboard: Pages project → **Settings → Functions → Bindings** →
-   - KV namespace: variable `SITE_KV` → your namespace
-   - D1 database: variable `SITE_DB` → `hon-x-db`
-4. **Set the secrets** (never commit these):
-   ```bash
-   pnpm dlx wrangler pages secret put ADMIN_KEY --project-name hon-x-web
-   # optional — enables instant cache purge on publish:
-   pnpm dlx wrangler pages secret put CF_API_TOKEN --project-name hon-x-web
-   ```
-   `CF_ZONE_ID` is not secret and can go in `wrangler.toml` `[vars]` or the dashboard.
-5. **Publish content:**
-   ```bash
-   curl -X POST https://hon-x.net/api/publish \
-     -H "x-admin-key: $ADMIN_KEY" \
-     -H "content-type: application/json" \
-     --data @src/data/site.json
-   ```
-
-### Environment variables / bindings reference
-
-| Name | Type | Required | Purpose |
-|---|---|---|---|
-| `SITE_KV` | KV namespace | for admin | Live content snapshot + active-version pointer |
-| `SITE_DB` | D1 database | for admin | Version history (`site_versions` table) |
-| `ADMIN_KEY` | secret | for admin | Auth for `POST /api/publish` (`x-admin-key` header) |
-| `CF_ZONE_ID` | var | optional | Zone id for edge cache purge on publish |
-| `CF_API_TOKEN` | secret | optional | Token (Cache Purge scope) for the purge call |
-
-> Deploys are billed to whichever Cloudflare account the Pages project lives on. When wiring D1/KV, double-check you're on the intended account — a wrong-account database id is a common "deploy won't update" trap.
+migrations/            0001_init.sql (RBAC + content history) · 0002_app_settings.sql
+scripts/               seed-owner.mjs · seed-content.mjs (th real + en translated)
+test/                  contract.test.mjs
+src/lib/
+  content-contract.ts  THE shared snapshot shape + validateSnapshot + migrateSnapshot (write & read)
+  content.ts           landing seam: resolveContent (reads site:live) + localize(snapshot, locale)
+  content-store.ts     publish / rollback / drafts / readLive
+  session.ts crypto.ts db.ts ratelimit.ts   auth + RBAC (CAN.*) + PBKDF2 + D1 + login rate-limit
+  translate.ts settings-store.ts seo-derive.ts
+src/pages/
+  index.astro · en/index.astro     public landing (th / en), render <Landing/>
+  admin/*.astro                     dashboard · content · seo · versions · users · audit · settings
+  api/*.ts                          login · logout · content · draft · publish · rollback · users · account · translate(-settings)
+  login.astro
+src/components/         Landing (hash router) · Navbar · Hero · ServerOath · WarReel · Factions ·
+                        VideoSpotlight · Register · Footer · DownloadSection · MemberSection · Countdown
+src/layouts/           Base.astro (landing) · Admin.astro (CMS shell)
+src/middleware.ts      auth guard — protects /admin + /api only
+```

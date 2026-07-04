@@ -1,0 +1,111 @@
+---
+export const prerender = false;
+import Admin from '../../layouts/Admin.astro';
+import { CAN, type AuthedUser } from '../../lib/session';
+import { listUsers, type D1Database } from '../../lib/db';
+
+const actor = (Astro.locals as any).user as AuthedUser;
+const db = (Astro.locals as any).db as D1Database | undefined;
+let users: any[] = [];
+if (db && CAN.manageUsers(actor)) users = await listUsers(db);
+function when(ms: number | null) { return ms ? new Date(ms).toISOString().slice(0, 10) : '—'; }
+---
+<Admin title="ผู้ใช้งาน" active="users">
+  <div class="page-h">
+    <div>
+      <h1>ผู้ใช้งาน & สิทธิ์</h1>
+      <div class="sub">เจ้าของเพิ่มทีมงานได้ · สิทธิ์: เจ้าของ (ทำได้ทุกอย่าง), ผู้แก้ไข (แก้ + เผยแพร่), ผู้ดูอย่างเดียว (ดูได้ไม่แก้)</div>
+    </div>
+    <button class="btn primary sm" id="newBtn">+ เพิ่มผู้ใช้</button>
+  </div>
+
+  <div class="notice ok" id="okNote" style="display:none"></div>
+  <div class="notice err" id="errNote" style="display:none"></div>
+
+  <div class="panel">
+    <h2>ทีมงาน</h2>
+    <table>
+      <thead>
+        <tr><th>อีเมล</th><th>ชื่อ</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าล่าสุด</th><th style="text-align:right">จัดการ</th></tr>
+      </thead>
+      <tbody>
+        {users.map((u) => (
+          <tr data-uid={u.id} data-email={u.email} data-role={u.role} data-disabled={u.disabled ? '1' : ''}>
+            <td class="data">{u.email}</td>
+            <td style="color:var(--txt-dim)">{u.name || '—'}</td>
+            <td><span class={`pill ${u.role}`}>{u.role === 'owner' ? 'เจ้าของ' : u.role === 'editor' ? 'ผู้แก้ไข' : 'ผู้ดูอย่างเดียว'}</span></td>
+            <td>{u.disabled ? <span class="pill off">ปิดใช้งาน</span> : <span class="pill live">ใช้งานอยู่</span>}</td>
+            <td class="data" style="color:var(--txt-faint)">{when(u.last_login)}</td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn sm act-edit">แก้ไข</button>
+              <button class="btn sm act-pw">ตั้งรหัสใหม่</button>
+              <button class="btn sm act-toggle">{u.disabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</button>
+              <button class="btn sm danger act-del">ลบ</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- modal (create/edit) -->
+  <div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);place-items:center;z-index:50">
+    <div class="panel" style="width:360px;margin:0">
+      <h2 id="modalTitle">เพิ่มผู้ใช้</h2>
+      <div class="field"><label>อีเมล</label><input id="m-email" class="mono" type="email" placeholder="teammate@hon-x.net"></div>
+      <div class="field"><label>ชื่อ</label><input id="m-name" placeholder="ชื่อที่แสดง"></div>
+      <div class="field"><label>สิทธิ์</label>
+        <select id="m-role"><option value="viewer">ผู้ดูอย่างเดียว</option><option value="editor">ผู้แก้ไข</option><option value="owner">เจ้าของ</option></select></div>
+      <div class="field" id="m-pwField"><label>รหัสผ่าน</label><input id="m-pw" type="password" placeholder="อย่างน้อย 10 ตัวอักษร"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+        <button class="btn sm" id="m-cancel">ยกเลิก</button>
+        <button class="btn primary sm" id="m-save">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('modal');
+    const okNote = document.getElementById('okNote'), errNote = document.getElementById('errNote');
+    let mode = 'create', editId = '';
+    function flash(kind, msg) { const el = kind === 'ok' ? okNote : errNote; okNote.style.display = 'none'; errNote.style.display = 'none'; el.textContent = msg; el.style.display = 'block'; }
+    function openModal(m, row) {
+      mode = m; modal.style.display = 'grid';
+      document.getElementById('modalTitle').textContent = m === 'create' ? 'เพิ่มผู้ใช้' : 'แก้ไขผู้ใช้';
+      document.getElementById('m-pwField').style.display = m === 'create' ? 'block' : 'none';
+      if (m === 'edit' && row) {
+        editId = row.dataset.uid;
+        document.getElementById('m-email').value = row.dataset.email;
+        document.getElementById('m-email').disabled = true;
+        document.getElementById('m-name').value = row.children[1].textContent === '—' ? '' : row.children[1].textContent;
+        document.getElementById('m-role').value = row.dataset.role;
+      } else {
+        editId = ''; document.getElementById('m-email').disabled = false;
+        ['m-email', 'm-name', 'm-pw'].forEach((i) => document.getElementById(i).value = '');
+        document.getElementById('m-role').value = 'viewer';
+      }
+    }
+    document.getElementById('newBtn').addEventListener('click', () => openModal('create'));
+    document.getElementById('m-cancel').addEventListener('click', () => modal.style.display = 'none');
+    document.getElementById('m-save').addEventListener('click', async () => {
+      const payload = mode === 'create'
+        ? { action: 'create', email: document.getElementById('m-email').value, name: document.getElementById('m-name').value, role: document.getElementById('m-role').value, password: document.getElementById('m-pw').value }
+        : { action: 'update', id: editId, name: document.getElementById('m-name').value, role: document.getElementById('m-role').value };
+      const res = await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (res.ok) { modal.style.display = 'none'; location.reload(); }
+      else flash('err', 'ไม่สำเร็จ: ' + (data.error || ''));
+    });
+
+    async function act(action, row, extra) {
+      const res = await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, id: row.dataset.uid, ...extra }) });
+      const data = await res.json();
+      if (res.ok) location.reload(); else flash('err', 'ไม่สำเร็จ: ' + (data.error || ''));
+    }
+    document.querySelectorAll('.act-edit').forEach((b) => b.addEventListener('click', (e) => openModal('edit', e.target.closest('tr'))));
+    // Toggle by the row's data-disabled flag (not button text, which is now Thai).
+    document.querySelectorAll('.act-toggle').forEach((b) => b.addEventListener('click', (e) => { const r = e.target.closest('tr'); act(r.dataset.disabled ? 'enable' : 'disable', r); }));
+    document.querySelectorAll('.act-del').forEach((b) => b.addEventListener('click', (e) => { const r = e.target.closest('tr'); if (confirm(`ลบผู้ใช้ ${r.dataset.email} ใช่ไหม?`)) act('delete', r); }));
+    document.querySelectorAll('.act-pw').forEach((b) => b.addEventListener('click', (e) => { const r = e.target.closest('tr'); const pw = prompt(`ตั้งรหัสผ่านใหม่ให้ ${r.dataset.email} (อย่างน้อย 10 ตัวอักษร):`); if (pw) act('resetpw', r, { password: pw }); }));
+  </script>
+</Admin>

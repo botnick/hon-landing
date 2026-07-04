@@ -1,79 +1,61 @@
 import type { APIRoute } from 'astro';
+import { publish, clearDraft } from '../../lib/content-store';
+import { audit, type D1Database } from '../../lib/db';
+import { CAN, type AuthedUser } from '../../lib/session';
 
 export const prerender = false;
 
-/**
- * Admin publish endpoint (scaffold). Writes a content snapshot to D1 (history) + KV
- * (live), bumps the active-version pointer, and purges the edge cache so the change
- * shows up immediately. Returns 501 locally when bindings are absent (JSON fallback mode).
- *
- * Auth: requires `x-admin-key` matching env.ADMIN_KEY. Do NOT enable without it.
- */
-interface Env {
-  SITE_DB?: any; // D1Database
-  SITE_KV?: any; // KVNamespace
-  ADMIN_KEY?: string;
-  CF_ZONE_ID?: string;
-  CF_API_TOKEN?: string;
-}
+const MAX_BODY = 512 * 1024; // 512 KB cap before parse (DoS guard)
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const env = ((locals as any)?.runtime?.env ?? {}) as Env;
+  const user = (locals as any).user as AuthedUser | null;
+  const env = (locals as any).runtime?.env as
+    | { CMS_DB?: D1Database; CMS_KV?: any; CF_ZONE_ID?: string; CF_API_TOKEN?: string }
+    | undefined;
+  const db = env?.CMS_DB;
 
-  if (!env.SITE_DB || !env.SITE_KV) {
-    return json({ ok: false, error: 'bindings missing — running in local/fallback mode' }, 501);
+  // AuthN handled by middleware; enforce AuthZ (publish = editor+) here.
+  if (!user || !CAN.publish(user)) {
+    return json({ error: 'forbidden' }, 403);
   }
-  if (!env.ADMIN_KEY || request.headers.get('x-admin-key') !== env.ADMIN_KEY) {
-    return json({ ok: false, error: 'unauthorized' }, 401);
-  }
+  if (!db) return json({ error: 'no database binding' }, 503);
 
-  let snapshot: unknown;
+  // Size cap BEFORE parsing.
+  const raw = await request.text();
+  if (raw.length > MAX_BODY) return json({ error: 'payload too large' }, 413);
+
+  let body: { snapshot?: unknown; note?: string; baseVersion?: number | null };
   try {
-    snapshot = await request.json();
+    body = JSON.parse(raw);
   } catch {
-    return json({ ok: false, error: 'invalid json body' }, 400);
+    return json({ error: 'invalid JSON' }, 400);
+  }
+  if (!body.snapshot) return json({ error: 'snapshot required' }, 400);
+
+  const result = await publish(
+    db,
+    env?.CMS_KV,
+    body.snapshot,
+    {
+      note: String(body.note ?? '').slice(0, 500),
+      authorId: user.id,
+      authorEmail: user.email,
+      baseVersion: typeof body.baseVersion === 'number' ? body.baseVersion : null,
+    },
+    { zoneId: env?.CF_ZONE_ID, apiToken: env?.CF_API_TOKEN },
+  );
+
+  if (!result.ok) {
+    await audit(db, { actorId: user.id, actorEmail: user.email, action: 'publish.reject', detail: (result.errors ?? []).slice(0, 3).join('; ') });
+    return json({ error: 'validation failed', details: result.errors }, 422);
   }
 
-  // Version by counter so we get a monotonic, human-readable history.
-  const prev = Number((await env.SITE_KV.get('site:counter')) ?? '0');
-  const version = prev + 1;
-  const snapKey = `site:v${version}`;
-  const body = JSON.stringify(snapshot);
-  const now = new Date().toISOString();
-
-  try {
-    await env.SITE_DB.prepare(
-      'INSERT INTO site_versions (version, json, created_at) VALUES (?, ?, ?)'
-    ).bind(version, body, now).run();
-  } catch {
-    // D1 table may not exist yet in a fresh env — KV publish still succeeds.
-  }
-
-  await env.SITE_KV.put(snapKey, body);
-  await env.SITE_KV.put('active_version', JSON.stringify({ key: snapKey, version }));
-  await env.SITE_KV.put('site:counter', String(version));
-
-  await purgeHome(env, new URL(request.url).origin);
-
-  return json({ ok: true, version, key: snapKey });
+  // Draft is now published — clear it so the "unpublished draft" badge disappears.
+  await clearDraft(env?.CMS_KV);
+  await audit(db, { actorId: user.id, actorEmail: user.email, action: 'publish', target: `v${result.version}`, detail: String(body.note ?? '').slice(0, 120) });
+  return json({ ok: true, version: result.version }, 200);
 };
 
-async function purgeHome(env: Env, origin: string) {
-  if (!env.CF_ZONE_ID || !env.CF_API_TOKEN) return;
-  try {
-    await fetch(`https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/purge_cache`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${env.CF_API_TOKEN}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ files: [`${origin}/`] }),
-    });
-  } catch {
-    /* non-fatal — short s-maxage will expire the cache anyway */
-  }
-}
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
+function json(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }

@@ -1,24 +1,40 @@
 ---
 import '../styles/global.css';
-import { getContent, fallbackContent } from '../lib/content';
-import Navbar from '../components/Navbar.astro';
+import type { LocalizedContent } from '../lib/content';
 import CursorTrail from '../components/CursorTrail.astro';
 
-const { content = fallbackContent, title: titleProp, description: descProp } = Astro.props;
-const site = getContent(content);
+interface Props { content: LocalizedContent; canonical?: string; altHref?: string; title?: string; description?: string }
+const { content, canonical: canonicalProp, altHref, title: titleProp, description: descProp } = Astro.props as Props;
+const site = content;
 const seo = site.seo;
+const locale = content.locale;
 const title = titleProp ?? seo.title;
 const description = descProp ?? seo.description;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net');
+const siteBase = Astro.site ?? new URL('https://hon-x.net');
+const canonical = new URL(canonicalProp ?? seo.canonical ?? Astro.url.pathname, siteBase);
+const thHref = locale === 'th' ? canonical.href : (altHref ?? new URL('/', siteBase).href);
+const enHref = locale === 'en' ? canonical.href : (altHref ?? new URL('/en', siteBase).href);
+let jsonLd = seo.jsonLd?.trim();
+if (!jsonLd) {
+  jsonLd = JSON.stringify({
+    '@context': 'https://schema.org', '@type': 'VideoGame',
+    name: 'Heroes of Newerth X', alternateName: 'HoN X', genre: 'MOBA',
+    inLanguage: locale, url: canonical.href, image: new URL(seo.ogImage, canonical).href, description,
+  });
+}
 ---
 <!doctype html>
-<html lang="th">
+<html lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical.href} />
+    <link rel="alternate" hreflang="th" href={thHref} />
+    <link rel="alternate" hreflang="en" href={enHref} />
+    <link rel="alternate" hreflang="x-default" href={thHref} />
+    {seo.robots && <meta name="robots" content={seo.robots} />}
     <meta name="theme-color" content={seo.themeColor} />
 
     <!-- Open Graph / Twitter -->
@@ -28,7 +44,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
     <meta property="og:description" content={description} />
     <meta property="og:image" content={new URL(seo.ogImage, canonical).href} />
     <meta property="og:url" content={canonical.href} />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content={seo.twitterCard || 'summary_large_image'} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={new URL(seo.ogImage, canonical).href} />
@@ -49,17 +65,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
       rel="stylesheet"
     />
 
-    <!-- VideoGame structured data for SEO -->
-    <script type="application/ld+json" set:html={JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'VideoGame',
-      name: 'Heroes of Newerth X',
-      alternateName: 'HoN X',
-      genre: 'MOBA',
-      url: canonical.href,
-      image: new URL(seo.ogImage, canonical).href,
-      description: description,
-    })} />
+    <!-- Structured data: CMS-authored JSON-LD if provided, else a derived VideoGame node. -->
+    <script type="application/ld+json" set:html={jsonLd} />
   </head>
   <body>
     <!-- Signature: the black stone GATE splits open on first paint, revealing the
@@ -71,8 +78,6 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
       <div class="gate-half gate-half--r"></div>
       <div class="gate-seam"></div>
     </div>
-
-    <Navbar content={content} />
 
     <slot />
 

@@ -1,0 +1,311 @@
+/**
+ * Seed the FIRST content version (v1) into D1 + KV, in the localized contract shape.
+ *
+ *   node scripts/seed-content.mjs
+ *
+ * Thai values are the REAL copy from the landing's site.json. English values are real
+ * translations of that copy (not lorem, not placeholders). After seeding, everything is
+ * editable from the admin — this is just the bootstrap so the landing has content to read.
+ */
+import { execFileSync } from 'node:child_process';
+
+const SCHEMA_VERSION = 1;
+
+const snapshot = {
+  schemaVersion: SCHEMA_VERSION,
+  phase: 'cbt',
+  seo: {
+    title: {
+      th: 'HoN X — Heroes of Newerth หวนคืน | Closed Beta',
+      en: 'HoN X — Heroes of Newerth Reborn | Closed Beta',
+    },
+    description: {
+      th: 'Heroes of Newerth X — MOBA ที่เร็ว ดุ และบริสุทธิ์ที่สุด กลับมาอีกครั้ง สมัคร Closed Beta วันนี้',
+      en: 'Heroes of Newerth X — the fastest, fiercest, purest MOBA is back. Join the Closed Beta today.',
+    },
+    ogImage: '/og.jpg',
+    canonical: 'https://hon-x.net/',
+    twitterCard: 'summary_large_image',
+    jsonLd: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'VideoGame',
+      name: 'Heroes of Newerth X',
+      inLanguage: 'th',
+      applicationCategory: 'Game',
+      operatingSystem: 'Windows',
+    }),
+    robots: 'index,follow',
+  },
+  hero: {
+    kicker: { th: 'HEROES OF NEWERTH', en: 'HEROES OF NEWERTH' },
+    headline: { th: 'ตำนานหวนคืน', en: 'The Legend Returns' },
+    headline2: { th: 'สู่เซิร์ฟไทยแท้', en: 'On a True Thai Server' },
+    subhead: {
+      th: 'MOBA ที่เร็ว ดุ และบริสุทธิ์ที่สุด — กลับมาเพื่อคุณ',
+      en: 'The fastest, fiercest, purest MOBA — back for you.',
+    },
+    ctaPrimary: { label: { th: 'เข้าร่วม Discord', en: 'Join Discord' }, href: 'https://discord.gg/Tf7bP8xHmA' },
+    ctaSecondary: { label: { th: 'ดูตัวอย่างเกม', en: 'Watch Gameplay' }, href: '#war' },
+    countdownTo: '2026-07-04T18:00:00+07:00',
+    countdownLabel: { th: 'ประตูเปิดใน', en: 'Gates open in' },
+  },
+  sections: {
+    hero: true, serverOath: true, war: true, roadmap: true, faq: true,
+    register: true, patchNotes: false,
+  },
+  faq: [
+    { q: { th: 'เล่นฟรีไหม', en: 'Is it free to play?' },
+      a: { th: 'ฟรีครับ ไม่มีค่าเข้าเล่น ช่วง Closed Beta รับคีย์ผ่านดิสคอร์ด',
+           en: 'Yes, free to play. During Closed Beta you get a key via Discord.' } },
+    { q: { th: 'เซิร์ฟไทยจริงไหม', en: 'Is there a real Thai server?' },
+      a: { th: 'จริงครับ เซิร์ฟในไทย ปิงต่ำ จับคู่กับคนไทยด้วยกัน',
+           en: 'Yes — a Thailand-hosted server, low ping, matched with Thai players.' } },
+    { q: { th: 'ของเก่าโหลดเลยได้ไหม', en: 'Can I use my old client?' },
+      a: { th: 'ต้องโหลดไคลเอนต์ใหม่ของ HoN X ตัวเก่าใช้ไม่ได้',
+           en: 'You need the new HoN X client; the old one will not work.' } },
+    { q: { th: 'สเปกเครื่องเท่าไหร่', en: 'What are the system requirements?' },
+      a: { th: 'สเปกไม่สูง เครื่องเล่นเกมทั่วไปรันได้สบาย',
+           en: 'Modest — any typical gaming PC runs it comfortably.' } },
+    { q: { th: 'ปิงสูง หลุดบ่อยไหม', en: 'High ping or frequent disconnects?' },
+      a: { th: 'เซิร์ฟไทยทำให้ปิงต่ำและเสถียรกว่าเดิมมาก',
+           en: 'The Thai server keeps ping low and connections far more stable.' } },
+    { q: { th: 'เข้า CBT ยังไง', en: 'How do I join the CBT?' },
+      a: { th: 'เข้าดิสคอร์ดแล้วรับคีย์ตามขั้นตอนในห้องประกาศ',
+           en: 'Join Discord and grab a key following the steps in the announcements.' } },
+  ],
+  roadmap: {
+    activeStage: 'cbt',
+    stages: [
+      { id: 'cbt', label: { th: 'Closed Beta', en: 'Closed Beta' } },
+      { id: 'obt', label: { th: 'Open Beta', en: 'Open Beta' } },
+      { id: 'launch', label: { th: 'เปิดตัวเต็ม', en: 'Full Launch' } },
+    ],
+  },
+  register: {
+    heading: { th: 'เข้าร่วม Closed Beta', en: 'Join the Closed Beta' },
+    body: {
+      th: 'ทุกอย่างเริ่มที่ Discord — รับคีย์ CBT, อัปเดตล่าสุด และเจอคอมมูนิตี้ไทยแท้ก่อนใคร',
+      en: 'It all starts on Discord — get your CBT key, the latest updates, and the Thai community first.',
+    },
+    cta: { label: { th: 'เข้าร่วม Discord', en: 'Join Discord' }, href: 'https://discord.gg/Tf7bP8xHmA' },
+  },
+  footer: {
+    note: { th: 'HoN X — สร้างโดยแฟนเพื่อแฟน', en: 'HoN X — by fans, for fans' },
+    links: [],
+  },
+  serverOath: {
+    eyebrow: 'THE SERVER OATH',
+    title: { th: 'คำสาบานของเซิร์ฟไทย', en: 'The Thai Server Oath' },
+    intro: {
+      th: 'ก่อนจะมีคำว่า MOBA กระแสหลัก มีเกมหนึ่งที่เร็วกว่า ดุกว่า เรียกร้องฝีมือมากกว่า — และครั้งนี้มันกลับมาบนเซิร์ฟที่สร้างเพื่อคนไทยจริงๆ นี่คือสิ่งที่เราสัญญา',
+      en: 'Before mainstream MOBAs, one game was faster, fiercer, and more demanding — and now it returns on a server built for Thai players. This is what we promise.',
+    },
+    proofs: [
+      { no: '01',
+        title: { th: 'จับคู่ผู้เล่นไทย', en: 'Matched with Thai Players' },
+        body: { th: 'กดหาแมตช์ในไทย เจอคนไทย — ไม่ใช่กดไทยแล้วโยนไปเซิร์ฟต่างชาติ ระบบล็อกภูมิภาคจริง',
+               en: 'Queue in Thailand, meet Thai players — not thrown to a foreign server. Real region locking.' },
+        metric: 'TH region-locked' },
+      { no: '02',
+        title: { th: 'ปิงต่ำ เส้นทางไทย', en: 'Low Ping, Thai Routing' },
+        body: { th: 'เซิร์ฟเวอร์และเส้นทางเชื่อมต่อวางในไทย ดีเลย์ต่ำ ตอบสนองไว เล่นสูสีทุกทีมไฟต์',
+               en: 'Servers and routes hosted in Thailand — low latency, snappy response, tight teamfights.' },
+        metric: 'Low-latency TH route' },
+      { no: '03',
+        title: { th: 'เสถียร ไม่หลุดกลางเกม', en: 'Stable, No Mid-Game Drops' },
+        body: { th: 'เฝ้าความเสถียรตลอด CBT — เป้าหมายคือไม่ค้าง ไม่หลุด ไม่รีทั้งแมตช์เพราะเซิร์ฟล่ม',
+               en: 'Stability watched throughout CBT — the goal: no freezes, no drops, no match remakes from server crashes.' },
+        metric: 'CBT stability watch' },
+    ],
+  },
+  war: {
+    eyebrow: 'THE WAR',
+    title: { th: 'สงครามที่ Newerth รอคุณอยู่', en: 'The War of Newerth Awaits' },
+    subtitle: { th: 'สองขั้วอำนาจ หนึ่งสนามรบ — เลือกข้างแล้วลงไปพิสูจน์',
+                en: 'Two powers, one battlefield — pick a side and prove yourself.' },
+    factionsLabel: { th: 'เลือกฝ่าย', en: 'Choose your side' },
+    spotlightLabel: { th: 'ชมสนามรบ', en: 'See the battlefield' },
+  },
+  factions: {
+    title: { th: 'สองขั้วแห่งสงคราม', en: 'Two Poles of War' },
+    hint: { th: 'เลือกฝ่ายของคุณ', en: 'Choose your side' },
+    legion: {
+      name: 'Legion',
+      tagline: 'Order · Nature · Light',
+      crest: '/art/crest-legion.png',
+      accent: '#40cd3c',
+      glow: 'rgba(64,205,60,0.45)',
+      lore: {
+        th: 'พันธมิตรของมนุษย์และเหล่า Beast Horde นำโดย King Jeraziah ผู้ที่ Sol เลือก ปกป้อง World Tree และผลักดันเหล่าปีศาจกลับสู่ขุมนรก',
+        en: 'An alliance of men and the Beast Horde, led by King Jeraziah, chosen of Sol — guarding the World Tree and driving the demons back to hell.',
+      },
+    },
+    hellbourne: {
+      name: 'Hellbourne',
+      tagline: 'Chaos · Blood · Demons',
+      crest: '/art/crest-hellbourne.png',
+      accent: '#dc0000',
+      glow: 'rgba(220,0,0,0.45)',
+      lore: {
+        th: 'เหล่าปีศาจและผู้ที่ถูกความมืดกลืนกิน นำโดย Maliken ผู้เคยเป็นราชาแห่ง Legion บูชายัญที่ Sacrificial Shrine เพื่อกลืนกิน Newerth ทั้งมวล',
+        en: 'Demons and those consumed by darkness, led by Maliken — once a Legion king — who sacrificed himself at the Shrine to devour all of Newerth.',
+      },
+    },
+  },
+  media: {
+    title: { th: 'ชมสนามรบ', en: 'See the Battlefield' },
+    subtitle: { th: 'ซีเนแมติกจากโลกแห่ง Newerth — ฉากที่คุณคิดถึง',
+                en: 'Cinematics from the world of Newerth — the scenes you missed.' },
+    label: 'Highlight',
+    reel: {
+      heading: { th: 'ช็อตเด็ดจากสนามรบ', en: 'Best Shots from the Battlefield' },
+      caption: { th: 'รวมจังหวะพีคๆ ความเร็วและความโหดแบบ HoN แท้ๆ',
+                 en: 'Peak moments — the true HoN speed and ferocity.' },
+    },
+    scenes: [
+      { image: '/art/scene-bastion',
+        heading: { th: 'ปราการแห่ง Legion', en: 'Bastion of the Legion' },
+        caption: { th: 'แสงทองสาดส่องปราการสุดท้ายก่อนสงครามจะเริ่ม',
+                   en: 'Golden light on the last bastion before war begins.' } },
+      { image: '/art/scene-hellbourne',
+        heading: { th: 'การรุกของ Hellbourne', en: 'The Hellbourne Onslaught' },
+        caption: { th: 'จากขุมนรก เหล่าปีศาจบุกทะลายแนวป้องกัน',
+                   en: 'From hell, demons breach the defensive line.' } },
+      { image: '/art/scene-clash',
+        heading: { th: 'การปะทะครั้งยิ่งใหญ่', en: 'The Great Clash' },
+        caption: { th: 'สองขั้วปะทะกลางสนามรบแห่ง Newerth',
+                   en: 'Two powers collide at the heart of Newerth.' } },
+    ],
+  },
+  // ── hon-landing-only blocks (single-HTML app: nav + #/download + #/member) ──
+  nav: {
+    links: [
+      { label: { th: 'หน้าแรก', en: 'Home' }, href: '#/' },
+      { label: { th: 'ดาวน์โหลด', en: 'Download' }, href: '#/download' },
+    ],
+    member: { label: { th: 'หน้าสมาชิก', en: 'Members' }, href: '#/member' },
+  },
+  download: {
+    seoTitle: { th: 'ดาวน์โหลด HoN X — Heroes of Newerth เซิร์ฟไทย', en: 'Download HoN X — Heroes of Newerth Thai Server' },
+    seoDescription: {
+      th: 'ดาวน์โหลดตัวเกม HoN X สำหรับ Windows พร้อมสเปกขั้นต่ำ วิธีติดตั้ง และลิงก์สำรอง',
+      en: 'Download the HoN X client for Windows — system requirements, install steps, and mirrors.',
+    },
+    eyebrow: 'THE ARMORY',
+    title: { th: 'ดาวน์โหลดตัวเกม', en: 'Download the Client' },
+    subtitle: { th: 'เตรียมเครื่องให้พร้อม แล้วกลับสู่สนามรบแห่ง Newerth', en: 'Get your rig ready and return to the battlefield of Newerth.' },
+    client: {
+      name: 'HoN X Client',
+      platform: 'Windows 10 / 11 (64-bit)',
+      version: { th: 'Closed Beta', en: 'Closed Beta' },
+      size: '~7 GB',
+      buttonLabel: { th: 'ดาวน์โหลดสำหรับ Windows', en: 'Download for Windows' },
+      href: 'https://drive.google.com/file/d/1WZfDCoSpzsdyuyYQMYhTk7SD5wfgYJRU/view?usp=sharing',
+      preloadHours: 6,
+      lockedNote: {
+        th: 'เปิดให้ดาวน์โหลดล่วงหน้า 6 ชั่วโมงก่อนเซิร์ฟเวอร์เปิด — เตรียมไฟล์ให้พร้อม พอประตูเปิดก็ลงสนามได้ทันที',
+        en: 'Preload opens 6 hours before servers go live — get the files ready and jump in the moment the gates open.',
+      },
+      lockedCountdownLabel: { th: 'โหลดได้ในอีก', en: 'Download opens in' },
+      mirrorLabel: { th: 'ลิงก์สำรอง', en: 'Mirrors' },
+      mirrors: [],
+    },
+    steps: {
+      title: { th: 'วิธีติดตั้ง', en: 'How to Install' },
+      items: [
+        { title: { th: 'ดาวน์โหลดตัวติดตั้ง', en: 'Download the installer' },
+          body: { th: 'โหลดไฟล์ติดตั้งจากปุ่มด้านบน หรือใช้ลิงก์สำรองถ้าลิงก์หลักช้า', en: 'Grab the installer from the button above, or a mirror if the main link is slow.' } },
+        { title: { th: 'ติดตั้งเกม', en: 'Install the game' },
+          body: { th: 'เปิดไฟล์ติดตั้งแล้วทำตามขั้นตอน เลือกไดรฟ์ที่มีพื้นที่ว่างเพียงพอ', en: 'Run the installer and follow the steps; pick a drive with enough free space.' } },
+        { title: { th: 'เข้าสู่ระบบ', en: 'Sign in' },
+          body: { th: 'ล็อกอินด้วยบัญชี HoN X ของคุณ — ยังไม่มีบัญชี สมัครได้ที่หน้าสมาชิก', en: 'Log in with your HoN X account — no account yet? Register on the Members page.' } },
+        { title: { th: 'ลงสนาม', en: 'Jump in' },
+          body: { th: 'ตัวเกมอัปเดตแพตช์ล่าสุดอัตโนมัติ แล้วเจอกันใน Newerth', en: 'The client auto-updates to the latest patch — see you in Newerth.' } },
+      ],
+    },
+    specs: {
+      title: { th: 'สเปกเครื่อง', en: 'System Requirements' },
+      minLabel: { th: 'ขั้นต่ำ', en: 'Minimum' },
+      recLabel: { th: 'แนะนำ', en: 'Recommended' },
+      rows: [
+        { part: { th: 'ระบบปฏิบัติการ', en: 'OS' }, min: { th: 'Windows 10 64-bit', en: 'Windows 10 64-bit' }, rec: { th: 'Windows 11 64-bit', en: 'Windows 11 64-bit' } },
+        { part: { th: 'ซีพียู', en: 'CPU' }, min: { th: 'Intel Core i3 หรือเทียบเท่า', en: 'Intel Core i3 or equivalent' }, rec: { th: 'Intel Core i5 ขึ้นไป', en: 'Intel Core i5 or better' } },
+        { part: { th: 'แรม', en: 'RAM' }, min: { th: '4 GB', en: '4 GB' }, rec: { th: '8 GB', en: '8 GB' } },
+        { part: { th: 'การ์ดจอ', en: 'GPU' }, min: { th: 'รองรับ DirectX 9', en: 'DirectX 9 capable' }, rec: { th: 'GTX 750 Ti หรือดีกว่า', en: 'GTX 750 Ti or better' } },
+        { part: { th: 'พื้นที่ว่าง', en: 'Storage' }, min: { th: '15 GB', en: '15 GB' }, rec: { th: '20 GB (SSD)', en: '20 GB (SSD)' } },
+        { part: { th: 'อินเทอร์เน็ต', en: 'Internet' }, min: { th: 'เชื่อมต่อเสถียร', en: 'Stable connection' }, rec: { th: 'เซิร์ฟไทย — ปิงต่ำเป็นพิเศษ', en: 'Thai server — extra-low ping' } },
+      ],
+    },
+  },
+  member: {
+    seoTitle: { th: 'หน้าสมาชิก — HoN X', en: 'Members — HoN X' },
+    seoDescription: {
+      th: 'ศูนย์บัญชาการของคุณ — จัดการบัญชี HoN X ติดตามสถานะ Closed Beta และรับสิทธิพิเศษ',
+      en: 'Your command center — manage your HoN X account, track Closed Beta status, and claim perks.',
+    },
+    eyebrow: 'THE GARRISON',
+    title: { th: 'หน้าสมาชิก', en: 'Members' },
+    subtitle: {
+      th: 'ศูนย์บัญชาการของคุณ — จัดการบัญชี ติดตามสถานะ Closed Beta และรับสิทธิพิเศษ',
+      en: 'Your command center — manage your account, track Closed Beta status, and claim perks.',
+    },
+    loginLabel: { th: 'เข้าสู่ระบบ', en: 'Log in' },
+    registerLabel: { th: 'สมัครสมาชิก', en: 'Register' },
+    portalUrl: 'https://portal.hon-x.net',
+    loginUrl: '',
+    registerUrl: '',
+    comingSoonNote: {
+      th: 'ระบบบัญชีจะเปิดใช้งานพร้อมช่วง Closed Beta — ระหว่างนี้เข้าดิสคอร์ดเพื่อรับคีย์ CBT และข่าวสารก่อนใคร',
+      en: 'Accounts open with the Closed Beta — for now, join Discord for your CBT key and the latest news.',
+    },
+    discordButtonLabel: { th: 'เข้าร่วม Discord', en: 'Join Discord' },
+    features: [
+      { no: '01', title: { th: 'บัญชีนักรบ', en: 'Warrior Account' },
+        body: { th: 'จัดการข้อมูลบัญชี เปลี่ยนรหัสผ่าน และผูกช่องทางติดต่อของคุณ', en: 'Manage your profile, change your password, and link your contacts.' },
+        status: { th: 'เร็วๆ นี้', en: 'Coming soon' } },
+      { no: '02', title: { th: 'คีย์ Closed Beta', en: 'Closed Beta Key' },
+        body: { th: 'เช็คสถานะคีย์ CBT ของคุณ และเปิดใช้งานคีย์เพื่อเข้าเล่น', en: 'Check your CBT key status and activate it to play.' },
+        status: { th: 'เร็วๆ นี้', en: 'Coming soon' } },
+      { no: '03', title: { th: 'ของรางวัลและสิทธิพิเศษ', en: 'Rewards & Perks' },
+        body: { th: 'รับไอเทมจากกิจกรรม และสิทธิพิเศษสำหรับผู้เล่นรุ่นบุกเบิก', en: 'Earn event items and founder perks for pioneer players.' },
+        status: { th: 'เร็วๆ นี้', en: 'Coming soon' } },
+    ],
+  },
+};
+
+const now = Date.now();
+const snapJson = JSON.stringify(snapshot).replace(/'/g, "''");
+
+// Idempotent seed: wipe prior content (FK order — live_pointer references
+// content_versions, so it MUST go first) and reset the version counter, then insert a
+// clean v1. Re-running this always yields exactly one version numbered 1.
+const sql = `
+DELETE FROM live_pointer;
+DELETE FROM content_versions;
+DELETE FROM sqlite_sequence WHERE name='content_versions';
+INSERT INTO content_versions (snapshot, schema_version, note, author_email, created_at)
+VALUES ('${snapJson}', ${SCHEMA_VERSION}, 'Initial seed from landing site.json (th real + en translated)', 'seed@hon-x.net', ${now});
+INSERT INTO live_pointer (id, version, published_at, published_by)
+VALUES (1, (SELECT MAX(version) FROM content_versions), ${now}, 'seed@hon-x.net')
+ON CONFLICT(id) DO UPDATE SET version=(SELECT MAX(version) FROM content_versions), published_at=${now}, published_by='seed@hon-x.net';
+`;
+
+console.log('Seeding content v1 into D1…');
+execFileSync('npx', ['wrangler', 'd1', 'execute', 'hon-x-cms', '--local', '--command', sql], {
+  stdio: 'inherit', cwd: process.cwd(),
+});
+
+// Write the live snapshot into local KV so the landing can read it. The hardened store
+// reads ONE atomic key `site:live` (codex fix); we also mirror the legacy pointer keys
+// so the fallback path in readLive() stays valid.
+console.log('Writing live snapshot into KV…');
+execFileSync('npx', ['wrangler', 'kv', 'key', 'put', '--binding', 'CMS_KV', '--local', 'site:live', JSON.stringify(snapshot)], {
+  stdio: 'inherit', cwd: process.cwd(),
+});
+execFileSync('npx', ['wrangler', 'kv', 'key', 'put', '--binding', 'CMS_KV', '--local', 'active_version', '1'], {
+  stdio: 'inherit', cwd: process.cwd(),
+});
+execFileSync('npx', ['wrangler', 'kv', 'key', 'put', '--binding', 'CMS_KV', '--local', 'site:v1', JSON.stringify(snapshot)], {
+  stdio: 'inherit', cwd: process.cwd(),
+});
+console.log('Done. Content v1 is live in D1 + KV (local).');

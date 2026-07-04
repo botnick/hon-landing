@@ -1,10 +1,11 @@
 ---
-import { getFactions, getSocial, getContent, fallbackContent } from '../lib/content';
-const { content = fallbackContent } = Astro.props;
+import { getFactions, getSocial, getContent, type LocalizedContent } from '../lib/content';
+const { content, altHref = '/' } = Astro.props as { content: LocalizedContent; altHref?: string };
 const site = getContent(content);
 const f = getFactions(content);
 const social = getSocial(content);
 const year = 2026; // build-time constant; no Date() in SSR-cached output
+const isEn = content.locale === 'en';
 ---
 <footer class="ft" id="site-footer">
   <!-- Stone rampart backdrop (atelier-gen, HoN dungeon wall) -->
@@ -48,6 +49,12 @@ const year = 2026; // build-time constant; no Date() in SSR-cached output
         </svg>Discord
       </a>
     )}
+    <!-- Language switch — links to the same page in the other locale (real hreflang pair). -->
+    <a class="ft-lang" href={altHref} rel="alternate" hreflang={isEn ? 'th' : 'en'}>
+      <span class={isEn ? '' : 'is-active'}>ไทย</span>
+      <span class="ft-lang-sep" aria-hidden="true">/</span>
+      <span class={isEn ? 'is-active' : ''}>EN</span>
+    </a>
     <p class="ft-copy">© {year} {site.brand.name} · Heroes of Newerth</p>
   </div>
 </footer>
@@ -128,6 +135,17 @@ const year = 2026; // build-time constant; no Date() in SSR-cached output
   .ft-social:hover { transform: translateY(-2px); background: rgba(88,101,242,0.14); color: #fff; border-color: rgba(88,101,242,0.6); }
   .ft-social-logo { width: 18px; height: 18px; flex: 0 0 auto; }
   .ft-copy { font-size: 0.8rem; color: var(--text-dim); opacity: 0.75; letter-spacing: 0.02em; }
+
+  /* Language switch — restrained brass text pair; active locale is gold. */
+  .ft-lang {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: var(--font-latin); font-size: 0.8rem; letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+  .ft-lang span.is-active { color: var(--gold-bright); }
+  .ft-lang span:not(.is-active):not(.ft-lang-sep) { opacity: 0.6; transition: opacity var(--dur-fast), color var(--dur-fast); }
+  .ft-lang:hover span:not(.is-active):not(.ft-lang-sep) { opacity: 1; color: var(--text); }
+  .ft-lang-sep { opacity: 0.35; }
 
   @media (max-width: 560px) {
     .ft-crests { gap: 1rem; }

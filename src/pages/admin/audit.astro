@@ -1,0 +1,53 @@
+---
+export const prerender = false;
+import Admin from '../../layouts/Admin.astro';
+import { CAN, type AuthedUser } from '../../lib/session';
+import type { D1Database } from '../../lib/db';
+
+const user = (Astro.locals as any).user as AuthedUser;
+const db = (Astro.locals as any).db as D1Database | undefined;
+let rows: any[] = [];
+if (db && CAN.viewAudit(user)) {
+  rows = (await db.prepare('SELECT at, actor_email, action, target, detail, ip FROM audit_log ORDER BY at DESC LIMIT 200').all()).results;
+}
+function when(ms: number) { return new Date(ms).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }); }
+// Friendly Thai labels for the recorded action codes.
+const ACTION_TH: Record<string, string> = {
+  login: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', login_failed: 'เข้าระบบไม่สำเร็จ',
+  publish: 'เผยแพร่เนื้อหา', rollback: 'ย้อนกลับเวอร์ชัน',
+  user_create: 'เพิ่มผู้ใช้', user_update: 'แก้ไขผู้ใช้', user_delete: 'ลบผู้ใช้',
+  user_disable: 'ปิดใช้งานผู้ใช้', user_enable: 'เปิดใช้งานผู้ใช้', password_reset: 'ตั้งรหัสผ่านใหม่',
+  password_change: 'เปลี่ยนรหัสผ่าน', publish_rejected: 'เผยแพร่ถูกปฏิเสธ',
+};
+const actionTh = (a: string) => ACTION_TH[a] ?? a;
+const hasRows = rows.length > 0;
+---
+<Admin title="ประวัติการแก้ไข" active="audit">
+  <div class="page-h">
+    <div>
+      <h1>ประวัติการแก้ไข</h1>
+      <div class="sub">บันทึกทุกการเข้าระบบ เผยแพร่ ย้อนกลับ และการจัดการผู้ใช้ — แก้ไม่ได้ ลบไม่ได้ ตรวจสอบย้อนหลังได้เสมอ</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>เหตุการณ์ล่าสุด · 200 รายการหลังสุด</h2>
+    <p class="empty" hidden={hasRows}>ยังไม่มีเหตุการณ์บันทึกไว้</p>
+    <table hidden={!hasRows}>
+      <thead>
+        <tr><th>เวลา</th><th>ใคร</th><th>ทำอะไร</th><th>กับอะไร</th><th>รายละเอียด</th><th>IP</th></tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr>
+            <td class="data" style="color:var(--txt-faint);white-space:nowrap">{when(r.at)}</td>
+            <td class="data" style="color:var(--txt-dim)">{r.actor_email || '—'}</td>
+            <td><span class="pill">{actionTh(r.action)}</span></td>
+            <td class="data" style="color:var(--txt-dim)">{r.target || '—'}</td>
+            <td style="color:var(--txt-dim);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{r.detail || '—'}</td>
+            <td class="data" style="color:var(--txt-faint)">{r.ip || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Admin>

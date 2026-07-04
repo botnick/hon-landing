@@ -1,0 +1,90 @@
+---
+// The shared one-page body for BOTH locales (/ = th, /en = en). Single-HTML app: home /
+// download / member are hidden views swapped by a hash router (#/, #/download, #/member).
+import Base from '../layouts/Base.astro';
+import Navbar from './Navbar.astro';
+import Hero from './Hero.astro';
+import ServerOath from './ServerOath.astro';
+import WarReel from './WarReel.astro';
+import Register from './Register.astro';
+import Footer from './Footer.astro';
+import DownloadSection from './DownloadSection.astro';
+import MemberSection from './MemberSection.astro';
+import { sectionEnabled, getMember, getPhaseContent, type LocalizedContent } from '../lib/content';
+
+interface Props { content: LocalizedContent; canonical: string; altHref: string }
+const { content, canonical, altHref } = Astro.props;
+
+// Member hand-off: once the hero cooldown ends, #/member goes straight to the portal.
+const portalUrl = getMember(content).portalUrl ?? '';
+const opensAt = getPhaseContent(content).countdownTo;
+---
+<Base content={content} canonical={canonical} altHref={altHref}>
+  <Navbar content={content} />
+
+  <div id="view-home" data-view>
+    {sectionEnabled('hero', content) && <Hero content={content} />}
+    {sectionEnabled('serverOath', content) && <ServerOath content={content} />}
+    {sectionEnabled('war', content) && <WarReel content={content} />}
+    {sectionEnabled('register', content) && <Register content={content} />}
+  </div>
+
+  <div id="view-download" data-view hidden>
+    <DownloadSection content={content} />
+  </div>
+
+  <div id="view-member" data-view hidden>
+    <MemberSection content={content} />
+  </div>
+
+  <Footer content={content} altHref={altHref} />
+
+  <style is:global>
+    /* hidden must beat any display the view children set */
+    [data-view][hidden] { display: none !important; }
+  </style>
+
+  <script is:inline define:vars={{ portalUrl, opensAt }}>
+    // Hash router for the single-HTML build: #/ → home, #/download, #/member.
+    // Plain anchors (#war, #register…) are left to native scrolling.
+    (function () {
+      var VIEWS = ['home', 'download', 'member'];
+      function portalOpen() {
+        return !!portalUrl && (!opensAt || Date.now() >= new Date(opensAt).getTime());
+      }
+      function route() {
+        var h = location.hash;
+        var r = h.indexOf('#/') === 0 ? h.slice(2).replace(/\/+$/, '') : '';
+        if (r === 'member' && portalOpen()) { location.replace(portalUrl); return; }
+        var name = VIEWS.indexOf(r) > 0 ? r : 'home';
+        VIEWS.forEach(function (v) {
+          var el = document.getElementById('view-' + v);
+          if (el) el.hidden = v !== name;
+        });
+        document.querySelectorAll('.nav-links a').forEach(function (a) {
+          var href = a.getAttribute('href') || '';
+          if (href.indexOf('#/') !== 0) return;
+          var target = href === '#/' ? 'home' : href.slice(2);
+          if (target === name) a.setAttribute('aria-current', 'page');
+          else a.removeAttribute('aria-current');
+        });
+        if (name !== 'home') window.scrollTo(0, 0);
+      }
+      document.addEventListener(
+        'click',
+        function (e) {
+          var el = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : null;
+          if (!el) return;
+          e.preventDefault();
+          var href = el.getAttribute('href');
+          if (location.hash !== href) history.pushState(null, '', href);
+          route();
+        },
+        true
+      );
+      window.addEventListener('hashchange', route);
+      window.addEventListener('popstate', route);
+      route();
+    })();
+  </script>
+</Base>

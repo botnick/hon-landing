@@ -1,6 +1,6 @@
 ---
-import { getFactions, fallbackContent } from '../lib/content';
-const { content = fallbackContent } = Astro.props;
+import { getFactions, type LocalizedContent } from '../lib/content';
+const { content } = Astro.props as { content: LocalizedContent };
 const f = getFactions(content);
 const L = f.legion;
 const H = f.hellbourne;

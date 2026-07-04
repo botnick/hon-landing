@@ -1,0 +1,91 @@
+---
+export const prerender = false;
+import '../styles/admin.css';
+import { CAN, type AuthedUser } from '../lib/session';
+
+interface Props { title: string; active: string; }
+const { title, active } = Astro.props;
+const user = (Astro.locals as any).user as AuthedUser | null;
+
+// Real env/store status for the top strip (grok signature) — reads actual bindings + live pointer.
+const env = (Astro.locals as any).runtime?.env as { CMS_DB?: unknown; CMS_KV?: unknown; CF_PAGES?: string } | undefined;
+const db = (Astro.locals as any).db;
+const dbOn = !!env?.CMS_DB;
+const kvOn = !!env?.CMS_KV;
+const envName = env?.CF_PAGES ? 'cloudflare' : 'local';
+let liveVer: number | null = null, lastPub = '';
+if (db) {
+  try {
+    const lp = await db.prepare('SELECT version, published_at FROM live_pointer WHERE id=1').first();
+    liveVer = lp?.version ?? null;
+    if (lp?.published_at) {
+      const mins = Math.floor((Date.now() - lp.published_at) / 60000);
+      lastPub = mins < 1 ? 'เมื่อครู่' : mins < 60 ? `${mins} นาทีที่แล้ว` : `${Math.floor(mins / 60)} ชั่วโมงที่แล้ว`;
+    }
+  } catch { /* pre-migration */ }
+}
+const online = dbOn && kvOn;
+// Role in plain Thai (editors shouldn't see 'owner/editor/viewer' role jargon raw).
+const roleTh: Record<string, string> = { owner: 'เจ้าของ', editor: 'ผู้แก้ไข', viewer: 'ผู้ดูอย่างเดียว' };
+
+const nav = [
+  { href: '/admin', key: 'dashboard', label: 'หน้าหลัก', ic: '◆', show: true },
+  { href: '/admin/content', key: 'content', label: 'เนื้อหาเว็บ', ic: '✎', show: CAN.viewContent(user) },
+  { href: '/admin/seo', key: 'seo', label: 'การค้นหา (SEO)', ic: '⌾', show: CAN.viewContent(user) },
+  { href: '/admin/versions', key: 'versions', label: 'ประวัติ & ย้อนกลับ', ic: '⟲', show: CAN.viewContent(user) },
+  { href: '/admin/audit', key: 'audit', label: 'ประวัติการแก้ไข', ic: '☰', show: CAN.viewAudit(user) },
+  { href: '/admin/users', key: 'users', label: 'ผู้ใช้งาน', ic: '⚇', show: CAN.manageUsers(user) },
+  { href: '/admin/settings', key: 'settings', label: 'ตั้งค่า', ic: '⚙', show: CAN.editSettings(user) },
+];
+---
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>{title} · HoN X CMS</title>
+</head>
+<body>
+  <div class="envbar">
+    <span><span class={online ? 'dot on' : 'dot off'}></span><b>สถานะ</b> {online ? 'พร้อมใช้งาน' : 'กำลังตั้งค่า'}</span>
+    <span><b>เว็บตอนนี้</b> {liveVer !== null ? `เวอร์ชัน ${liveVer}` : 'ยังไม่เผยแพร่'}</span>
+    <span title={`ระบบ: ${envName}`}>{envName === 'cloudflare' ? 'ออนไลน์' : 'บนเครื่อง'}</span>
+    <span class="spacer"></span>
+    <span>{lastPub ? `เผยแพร่ล่าสุด ${lastPub}` : 'ยังไม่เคยเผยแพร่'}</span>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="brand">
+        <img class="mark" src="/brand/logo.webp" width="26" height="28" alt="HoN X" />
+        <div><b>HoN X&nbsp;CMS</b><small>heroesofnewerth</small></div>
+      </div>
+      <nav class="nav">
+        {nav.filter((n) => n.show).map((n) => (
+          <a href={n.href} class={active === n.key ? 'active' : ''}>
+            <span class="ic">{n.ic}</span>{n.label}
+          </a>
+        ))}
+      </nav>
+      <div class="foot">
+        <div class="who">
+          <b>{user?.name || user?.email}</b>
+          <div class="role">{roleTh[user?.role ?? ''] ?? user?.role}</div>
+        </div>
+        <button class="btn sm danger" id="logoutBtn" style="width:100%;justify-content:center;margin-top:8px">
+          ออกจากระบบ
+        </button>
+      </div>
+    </aside>
+    <main class="main">
+      <slot />
+    </main>
+  </div>
+  <script>
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      const res = await fetch('/api/logout', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      window.location.href = data.redirect || '/login';
+    });
+  </script>
+</body>
+</html>

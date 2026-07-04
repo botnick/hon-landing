@@ -1,8 +1,8 @@
 ---
 import Countdown from './Countdown.tsx';
-import { getContent, getPhaseContent, fallbackContent } from '../lib/content';
+import { getContent, getPhaseContent, type LocalizedContent } from '../lib/content';
 
-const { content = fallbackContent } = Astro.props;
+const { content } = Astro.props as { content: LocalizedContent };
 const site = getContent(content);
 const p = getPhaseContent(content);
 ---
@@ -49,7 +49,7 @@ const p = getPhaseContent(content);
         <!-- Gate-lock: the countdown is the seal on the gate. A faint rune sigil
              sits behind it (grok's ยันต์, kept as ornament — codex's call). -->
         <span class="cd-rune" aria-hidden="true"></span>
-        <Countdown client:load to={p.countdownTo} label={p.countdownLabel} />
+        <Countdown client:load to={p.countdownTo} label={p.countdownLabel} locale={content.locale} />
       </div>
     )}
 
