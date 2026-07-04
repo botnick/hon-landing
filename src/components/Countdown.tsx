@@ -1,7 +1,26 @@
 import { useEffect, useState } from 'react';
 
-/** Live countdown island. Only this tiny component ships JS — the rest is static. */
-export default function Countdown({ to, label }: { to: string; label?: string }) {
+interface Units {
+  day: string;
+  hour: string;
+  min: string;
+  sec: string;
+}
+
+/** Live countdown island. Only this tiny component ships JS — the rest is static.
+ *  Unit/done labels come from the content's ui dict so they follow the page language. */
+export default function Countdown({
+  to,
+  label,
+  units,
+  doneLabel,
+}: {
+  to: string;
+  label?: string;
+  units?: Units;
+  doneLabel?: string;
+}) {
+  const u: Units = units ?? { day: 'วัน', hour: 'ชม.', min: 'นาที', sec: 'วินาที' };
   const target = to ? new Date(to).getTime() : 0;
   const [now, setNow] = useState<number | null>(null);
 
@@ -34,16 +53,16 @@ export default function Countdown({ to, label }: { to: string; label?: string })
 
   return (
     <div className="cd" role="timer" aria-label={label}>
-      {label && <div className="cd-label">{done ? 'เปิดแล้ว' : label}</div>}
+      {label && <div className="cd-label">{done ? (doneLabel ?? 'เปิดแล้ว') : label}</div>}
       {!done && (
         <div className="cd-grid">
-          {cell(d, 'วัน')}
+          {cell(d, u.day)}
           <span className="cd-sep">:</span>
-          {cell(h, 'ชม.')}
+          {cell(h, u.hour)}
           <span className="cd-sep">:</span>
-          {cell(m, 'นาที')}
+          {cell(m, u.min)}
           <span className="cd-sep">:</span>
-          {cell(s, 'วินาที')}
+          {cell(s, u.sec)}
         </div>
       )}
     </div>

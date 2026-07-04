@@ -4,21 +4,28 @@ import { getContent, fallbackContent } from '../lib/content';
 import Navbar from '../components/Navbar.astro';
 import CursorTrail from '../components/CursorTrail.astro';
 
-const { content = fallbackContent, title: titleProp, description: descProp } = Astro.props;
+const { content = fallbackContent, title: titleProp, description: descProp, lang = 'th' } = Astro.props;
 const site = getContent(content);
 const seo = site.seo;
 const title = titleProp ?? seo.title;
 const description = descProp ?? seo.description;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net');
+const origin = Astro.site ?? 'https://hon-x.net';
+const canonical = new URL(Astro.url.pathname, origin);
+// Language alternates: / is Thai (default), /en/ is English — same single-HTML app.
+const altTh = new URL('/', origin).href;
+const altEn = new URL('/en/', origin).href;
 ---
 <!doctype html>
-<html lang="th">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical.href} />
+    <link rel="alternate" hreflang="th" href={altTh} />
+    <link rel="alternate" hreflang="en" href={altEn} />
+    <link rel="alternate" hreflang="x-default" href={altTh} />
     <meta name="theme-color" content={seo.themeColor} />
 
     <!-- Open Graph / Twitter -->
@@ -32,6 +39,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
     <meta property="og:image:type" content="image/jpeg" />
     {seo.ogImageAlt && <meta property="og:image:alt" content={seo.ogImageAlt} />}
     <meta property="og:url" content={canonical.href} />
+    <meta property="og:locale" content={lang === 'en' ? 'en_US' : 'th_TH'} />
+    <meta property="og:locale:alternate" content={lang === 'en' ? 'th_TH' : 'en_US'} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
@@ -72,7 +81,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
       gamePlatform: 'PC',
       applicationCategory: 'Game',
       operatingSystem: 'Windows',
-      inLanguage: 'th',
+      inLanguage: lang,
       url: canonical.href,
       image: new URL(seo.ogImage, canonical).href,
       description: description,
@@ -95,7 +104,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://hon-x.net')
     <slot />
 
     <!-- Optional mystical cursor trail (off by default, user-toggleable) -->
-    <CursorTrail />
+    <CursorTrail content={content} />
 
     <script is:inline>
       // Fire the gate open after first paint, then strip the node.

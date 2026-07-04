@@ -1,10 +1,11 @@
 ---
 import Countdown from './Countdown.tsx';
-import { getContent, getPhaseContent, fallbackContent } from '../lib/content';
+import { getContent, getPhaseContent, getUi, fallbackContent } from '../lib/content';
 
 const { content = fallbackContent } = Astro.props;
 const site = getContent(content);
 const p = getPhaseContent(content);
+const ui = getUi(content);
 ---
 <section class="hero" id="top">
   <!-- Layered backdrop: keyart + parallax embers + vignette. Pure CSS/decor, no JS. -->
@@ -49,7 +50,7 @@ const p = getPhaseContent(content);
         <!-- Gate-lock: the countdown is the seal on the gate. A faint rune sigil
              sits behind it (grok's ยันต์, kept as ornament — codex's call). -->
         <span class="cd-rune" aria-hidden="true"></span>
-        <Countdown client:load to={p.countdownTo} label={p.countdownLabel} />
+        <Countdown client:load to={p.countdownTo} label={p.countdownLabel} units={ui.countdown} doneLabel={ui.countdown.opened} />
       </div>
     )}
 

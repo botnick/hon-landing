@@ -1,103 +1,14 @@
 ---
 export const prerender = false; // SSR: read live content (KV) per request, fall back to site.json
 
-import Base from '../layouts/Base.astro';
-import Hero from '../components/Hero.astro';
-import ServerOath from '../components/ServerOath.astro';
-import WarReel from '../components/WarReel.astro';
-import Roadmap from '../components/Roadmap.astro';
-import Faq from '../components/Faq.astro';
-import PatchNotes from '../components/PatchNotes.astro';
-import Register from '../components/Register.astro';
-import Footer from '../components/Footer.astro';
-import DownloadSection from '../components/DownloadSection.astro';
-import MemberSection from '../components/MemberSection.astro';
-import { resolveContent, sectionEnabled, getMember, getPhaseContent } from '../lib/content';
+import Landing from '../layouts/Landing.astro';
+import { resolveContent } from '../lib/content';
 
 // One KV read per request (or bundled fallback locally). Threaded to every section.
 const content = await resolveContent(Astro.locals as any);
-
-// Single-HTML app: the host serves ONE document, so download/member live here as
-// hidden views and a tiny hash router (#/download, #/member) swaps them in.
-// Member hand-off: once the hero cooldown ends, #/member goes straight to the portal.
-const m = getMember(content) as { portalUrl?: string };
-const portalUrl = m.portalUrl ?? '';
-const opensAt = getPhaseContent(content).countdownTo;
 
 // Edge-cache briefly so most visitors hit cache, but admin edits surface within ~30s
 // (publish also purges the cache for instant reflection). SWR keeps it snappy.
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
 ---
-<Base content={content}>
-  <div id="view-home" data-view>
-    {sectionEnabled('hero', content) && <Hero content={content} />}
-    {sectionEnabled('serverOath', content) && <ServerOath content={content} />}
-    {sectionEnabled('war', content) && <WarReel content={content} />}
-    {sectionEnabled('roadmap', content) && <Roadmap content={content} />}
-    {sectionEnabled('faq', content) && <Faq content={content} />}
-    {sectionEnabled('patchNotes', content) && <PatchNotes content={content} />}
-    {sectionEnabled('register', content) && <Register content={content} />}
-  </div>
-
-  <div id="view-download" data-view hidden>
-    <DownloadSection content={content} />
-  </div>
-
-  <div id="view-member" data-view hidden>
-    <MemberSection content={content} />
-  </div>
-
-  <Footer content={content} />
-
-  <style is:global>
-    /* hidden must beat any display the view children set */
-    [data-view][hidden] { display: none !important; }
-  </style>
-
-  <script is:inline define:vars={{ portalUrl, opensAt }}>
-    // Hash router for the single-HTML build: #/ → home, #/download, #/member.
-    // Plain anchors (#war, #register…) are left to native scrolling.
-    (function () {
-      var VIEWS = ['home', 'download', 'member'];
-      function portalOpen() {
-        return !!portalUrl && (!opensAt || Date.now() >= new Date(opensAt).getTime());
-      }
-      function route() {
-        var h = location.hash;
-        var r = h.indexOf('#/') === 0 ? h.slice(2).replace(/\/+$/, '') : '';
-        if (r === 'member' && portalOpen()) { location.replace(portalUrl); return; }
-        var name = VIEWS.indexOf(r) > 0 ? r : 'home';
-        VIEWS.forEach(function (v) {
-          var el = document.getElementById('view-' + v);
-          if (el) el.hidden = v !== name;
-        });
-        // nav highlight follows the active view
-        document.querySelectorAll('.nav-links a').forEach(function (a) {
-          var href = a.getAttribute('href') || '';
-          if (href.indexOf('#/') !== 0) return;
-          var target = href === '#/' ? 'home' : href.slice(2);
-          if (target === name) a.setAttribute('aria-current', 'page');
-          else a.removeAttribute('aria-current');
-        });
-        if (name !== 'home') window.scrollTo(0, 0);
-      }
-      // Belt-and-braces click handling (capture phase): route immediately even if
-      // something else swallows the hash change, and re-route on same-link clicks.
-      document.addEventListener(
-        'click',
-        function (e) {
-          var el = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : null;
-          if (!el) return;
-          e.preventDefault();
-          var href = el.getAttribute('href');
-          if (location.hash !== href) history.pushState(null, '', href);
-          route();
-        },
-        true
-      );
-      window.addEventListener('hashchange', route);
-      window.addEventListener('popstate', route);
-      route();
-    })();
-  </script>
-</Base>
+<Landing content={content} lang="th" />

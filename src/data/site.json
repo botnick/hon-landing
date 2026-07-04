@@ -1,6 +1,7 @@
 {
   "_comment": "Single source of truth for ALL site content. No hardcoded strings in components — everything reads from here (build) or KV (live). Admin panel edits this shape.",
   "phase": "cbt",
+  "lang": "th",
   "brand": {
     "name": "HoN X",
     "domain": "hon-x.net",
@@ -252,6 +253,27 @@
       { "no": "02", "title": "คีย์ Closed Beta", "body": "เช็คสถานะคีย์ CBT ของคุณ และเปิดใช้งานคีย์เพื่อเข้าเล่น", "status": "เร็วๆ นี้" },
       { "no": "03", "title": "ของรางวัลและสิทธิพิเศษ", "body": "รับไอเทมจากกิจกรรม และสิทธิพิเศษสำหรับผู้เล่นรุ่นบุกเบิก", "status": "เร็วๆ นี้" }
     ]
+  },
+  "ui": {
+    "_comment": "Chrome strings that don't belong to any one section — countdown units, aria labels, the language switcher. Translated per-language like everything else.",
+    "countdown": { "day": "วัน", "hour": "ชม.", "min": "นาที", "sec": "วินาที", "opened": "เปิดแล้ว" },
+    "roadmapNow": "ตอนนี้",
+    "langSwitch": "เปลี่ยนภาษา",
+    "aria": {
+      "mainMenu": "เมนูหลัก",
+      "home": "หน้าแรก",
+      "backToTop": "กลับขึ้นด้านบน",
+      "crest": "ตรา",
+      "crestOf": "ตราสัญลักษณ์",
+      "prevFaction": "ฝ่ายก่อนหน้า",
+      "nextFaction": "ฝ่ายถัดไป",
+      "sceneTabs": "เลือกฉาก",
+      "scene": "ฉากที่",
+      "cursorFx": "เอฟเฟกต์เมาส์",
+      "cursorFxToggle": "เปิด/ปิด เอฟเฟกต์เมาส์",
+      "cursorFxOn": "เอฟเฟกต์เมาส์ · เปิดอยู่",
+      "cursorFxOff": "เอฟเฟกต์เมาส์ · คลิกเพื่อเปิด"
+    }
   },
   "seo": {
     "title": "HoN X — Heroes of Newerth หวนคืน | Closed Beta",

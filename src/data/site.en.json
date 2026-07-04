@@ -1,0 +1,217 @@
+{
+  "_comment": "English TEXT overrides only. localizeContent() deep-merges this over the resolved Thai content (bundled or live KV) for /en/ — so hrefs, dates, colors, phase and section toggles are NOT repeated here and always follow the single source of truth. Arrays merge element-wise: keep the same order/length as site.json and only include the translated fields.",
+  "lang": "en",
+  "phases": {
+    "cbt": {
+      "headline": "The Legend Returns",
+      "headline2": "On a True Thai Server",
+      "subhead": "The fastest, fiercest, purest MOBA — back for you",
+      "body": "Heroes of Newerth the way you remember it. Nothing in the way — fast, brutal, truly hardcore. Sign up for the Closed Beta and be first back on the battlefield of Newerth.",
+      "ctaPrimary": { "label": "Join Discord" },
+      "ctaSecondary": { "label": "Watch Gameplay" },
+      "countdownLabel": "Gates open in"
+    },
+    "obt": {
+      "kicker": "Open to everyone",
+      "headline": "Open Beta Is Live",
+      "subhead": "Jump into battle today — no waiting",
+      "body": "The gates of Newerth are wide open. Free to play — bring your friends.",
+      "ctaPrimary": { "label": "Play Now" },
+      "ctaSecondary": { "label": "Join Discord" }
+    },
+    "launch": {
+      "kicker": "Officially launched",
+      "subhead": "The battlefield is officially open",
+      "body": "Join players across the region in the legendary MOBA, reborn.",
+      "ctaPrimary": { "label": "Play Now" },
+      "ctaSecondary": { "label": "Join Discord" }
+    }
+  },
+  "serverOath": {
+    "title": "The Thai Server Oath",
+    "intro": "Before MOBA went mainstream, there was a game that was faster, fiercer, and demanded more skill — and this time it returns on a server truly built for Thai players. This is what we promise.",
+    "proofs": [
+      {
+        "title": "Thai Matchmaking",
+        "body": "Queue in Thailand, meet Thai players — not queued locally and thrown onto a foreign server. The region lock is real."
+      },
+      {
+        "title": "Low Ping, Thai Routing",
+        "body": "Servers and network routes hosted in Thailand. Low latency, instant response — fight on even footing in every teamfight."
+      },
+      {
+        "title": "Stable — No Mid-game Drops",
+        "body": "Stability is monitored throughout CBT — the goal: no freezes, no disconnects, no remaking matches because the server died."
+      }
+    ]
+  },
+  "war": {
+    "title": "The War Newerth Awaits",
+    "subtitle": "Two powers, one battlefield — pick a side and prove yourself",
+    "factionsLabel": "Choose Your Side",
+    "spotlightLabel": "Watch the Battlefield"
+  },
+  "factions": {
+    "title": "Two Sides of the War",
+    "hint": "Choose your side",
+    "legion": {
+      "lore": "An alliance of humanity and the Beast Horde, led by King Jeraziah, the chosen of Sol — sworn to protect the World Tree and drive the demons back into the abyss."
+    },
+    "hellbourne": {
+      "lore": "Demons and those consumed by darkness, led by Maliken, once king of the Legion — sacrificed at the Sacrificial Shrine to devour all of Newerth."
+    }
+  },
+  "media": {
+    "title": "Watch the Battlefield",
+    "subtitle": "Cinematics from the world of Newerth — the scenes you've missed",
+    "reel": {
+      "heading": "Best Shots from the Battlefield",
+      "caption": "Peak moments — the speed and brutality of true HoN"
+    },
+    "scenes": [
+      {
+        "heading": "Bastion of the Legion",
+        "caption": "Golden light falls on the last bastion before the war begins"
+      },
+      {
+        "heading": "The Hellbourne Assault",
+        "caption": "From the abyss, the demons crash through the defenses"
+      },
+      {
+        "heading": "The Great Clash",
+        "caption": "Two powers collide in the heart of Newerth"
+      }
+    ]
+  },
+  "register": {
+    "title": "Join the Closed Beta",
+    "subtitle": "It all starts on Discord — get your CBT key, the latest updates, and meet the community before anyone else",
+    "buttonLabel": "Join Discord",
+    "note": "Closed Beta keys and how to get in will be announced on Discord"
+  },
+  "roadmap": {
+    "title": "The Road to the Battlefield",
+    "intro": "Three stages before the gates fully open. We're at the first one now.",
+    "stages": [
+      { "note": "Closed testing — keys via Discord. Every bit of feedback tunes the Thai server." },
+      { "note": "Open to everyone. Free to play — bring your friends." },
+      { "note": "Full launch. The battlefield of Newerth, ready for all." }
+    ]
+  },
+  "faq": {
+    "eyebrow": "Before you deploy",
+    "title": "Frequently Asked Questions",
+    "items": [
+      {
+        "q": "Is it free to play?",
+        "a": "Yes, completely free. During the Closed Beta, keys are distributed via Discord."
+      },
+      {
+        "q": "Is it really a Thai server? Will I match with Thai players?",
+        "a": "Yes. The region lock is real — queue in Thailand and you meet Thai players, not get thrown onto a foreign server."
+      },
+      {
+        "q": "I played the old HoN — can I just download and play?",
+        "a": "Absolutely. It's HoN the way you remember it. Download the client and hit the battlefield — your old skills still count."
+      },
+      {
+        "q": "How powerful does my PC need to be?",
+        "a": "The requirements are light — it runs on everyday machines. See the minimum and recommended specs on the download page."
+      },
+      {
+        "q": "How's the ping? Will I get dropped mid-game?",
+        "a": "Servers and routing are hosted in Thailand for low ping, and we monitor stability throughout CBT. The goal: no drops, no freezes."
+      },
+      {
+        "q": "How do I join the CBT?",
+        "a": "Join our Discord, follow the steps to claim a key, and watch for the server-open announcement. Every update is posted there."
+      }
+    ]
+  },
+  "patchNotes": {
+    "eyebrow": "From the dev team",
+    "title": "Updates from the Team",
+    "intro": "Real progress notes from the dev team — posting begins when the Closed Beta opens."
+  },
+  "nav": {
+    "links": [
+      { "label": "Home" },
+      { "label": "Download" }
+    ],
+    "member": { "label": "Member" }
+  },
+  "download": {
+    "seoTitle": "Download HoN X — Heroes of Newerth Thai Server",
+    "seoDescription": "Download the HoN X game client for Windows — minimum specs, install guide, and mirror links. Return to the battlefield of Newerth.",
+    "title": "Download the Game",
+    "subtitle": "Get your machine ready and return to the battlefield of Newerth",
+    "client": {
+      "buttonLabel": "Download for Windows",
+      "lockedNote": "Pre-load opens 6 hours before the servers go live — get the files ready and hit the battlefield the second the gates open.",
+      "lockedCountdownLabel": "Available in",
+      "mirrorLabel": "Mirrors"
+    },
+    "steps": {
+      "title": "How to Install",
+      "items": [
+        { "title": "Download the installer", "body": "Grab the installer from the button above, or use a mirror link if the main one is slow." },
+        { "title": "Install the game", "body": "Run the installer and follow the steps. Pick a drive with enough free space." },
+        { "title": "Log in", "body": "Sign in with your HoN X account — don't have one yet? Register on the member page." },
+        { "title": "Enter the battlefield", "body": "The game patches itself to the latest version automatically. See you in Newerth." }
+      ]
+    },
+    "specs": {
+      "title": "System Requirements",
+      "minLabel": "Minimum",
+      "recLabel": "Recommended",
+      "rows": [
+        { "part": "Operating system" },
+        { "part": "CPU", "min": "Intel Core i3 or equivalent", "rec": "Intel Core i5 or better" },
+        { "part": "RAM" },
+        { "part": "Graphics", "min": "DirectX 9 compatible", "rec": "GTX 750 Ti or better" },
+        { "part": "Storage" },
+        { "part": "Internet", "min": "Stable connection", "rec": "Thai server — extra-low ping" }
+      ]
+    }
+  },
+  "member": {
+    "seoTitle": "Member — HoN X",
+    "seoDescription": "Your command center — manage your HoN X account, track your Closed Beta status, and claim perks",
+    "title": "Member",
+    "subtitle": "Your command center — manage your account, track your Closed Beta status, and claim perks",
+    "loginLabel": "Log In",
+    "registerLabel": "Register",
+    "comingSoonNote": "Accounts go live with the Closed Beta — in the meantime, join Discord to grab a CBT key and get news first.",
+    "discordButtonLabel": "Join Discord",
+    "features": [
+      { "title": "Warrior Account", "body": "Manage your account details, change your password, and link your contact channels.", "status": "Coming soon" },
+      { "title": "Closed Beta Key", "body": "Check the status of your CBT key and activate it to play.", "status": "Coming soon" },
+      { "title": "Rewards & Perks", "body": "Claim event items and exclusive perks for founding players.", "status": "Coming soon" }
+    ]
+  },
+  "ui": {
+    "countdown": { "day": "Days", "hour": "Hrs", "min": "Min", "sec": "Sec", "opened": "Open now" },
+    "roadmapNow": "Now",
+    "langSwitch": "Switch language",
+    "aria": {
+      "mainMenu": "Main menu",
+      "home": "Home",
+      "backToTop": "Back to top",
+      "crest": "Crest of",
+      "crestOf": "Emblem of",
+      "prevFaction": "Previous faction",
+      "nextFaction": "Next faction",
+      "sceneTabs": "Choose scene",
+      "scene": "Scene",
+      "cursorFx": "Cursor effect",
+      "cursorFxToggle": "Toggle cursor effect",
+      "cursorFxOn": "Cursor effect · On",
+      "cursorFxOff": "Cursor effect · Click to enable"
+    }
+  },
+  "seo": {
+    "title": "HoN X — Heroes of Newerth Returns | Closed Beta",
+    "description": "Heroes of Newerth X — the fastest, fiercest, purest MOBA is back. Sign up for the Closed Beta today and join the battlefield of Newerth.",
+    "ogImageAlt": "HoN X — Better than you remember | Heroes of Newerth, true Thai server"
+  }
+}

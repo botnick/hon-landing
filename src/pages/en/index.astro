@@ -1,0 +1,13 @@
+---
+export const prerender = false; // SSR: same live content as /, overlaid with English text
+
+import Landing from '../../layouts/Landing.astro';
+import { resolveContent, localizeContent } from '../../lib/content';
+
+// Same KV read as the Thai page, then the bundled English text overlay on top —
+// links, dates, phase and toggles stay shared with the live (admin-edited) content.
+const content = localizeContent(await resolveContent(Astro.locals as any), 'en');
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
+---
+<Landing content={content} lang="en" />

@@ -1,9 +1,10 @@
 ---
-import { getFactions, getSocial, getContent, fallbackContent } from '../lib/content';
+import { getFactions, getSocial, getContent, getUi, fallbackContent } from '../lib/content';
 const { content = fallbackContent } = Astro.props;
 const site = getContent(content);
 const f = getFactions(content);
 const social = getSocial(content);
+const ui = getUi(content);
 const year = 2026; // build-time constant; no Date() in SSR-cached output
 ---
 <footer class="ft" id="site-footer">
@@ -23,11 +24,11 @@ const year = 2026; // build-time constant; no Date() in SSR-cached output
   <!-- Three crests: Legion · HoN · Hellbourne (like the original portal) -->
   <div class="ft-crests">
     <div class="ft-crest ft-crest--legion">
-      <img src={f.legion.crest} alt={`ตรา ${f.legion.name}`} width="96" height="96" loading="lazy" />
+      <img src={f.legion.crest} alt={`${ui.aria.crest} ${f.legion.name}`} width="96" height="96" loading="lazy" />
       <span class="ft-crest-name" style={`color:${f.legion.accent}`}>{f.legion.name}</span>
     </div>
 
-    <a class="ft-emblem" href="#top" aria-label={`${site.brand.name} — กลับขึ้นด้านบน`}>
+    <a class="ft-emblem" href="#top" aria-label={`${site.brand.name} — ${ui.aria.backToTop}`}>
       <picture>
         <source srcset={site.brand.logoWebp} type="image/webp" />
         <img src={site.brand.logo} alt={site.brand.name} width="150" height="80" loading="lazy" />
@@ -35,7 +36,7 @@ const year = 2026; // build-time constant; no Date() in SSR-cached output
     </a>
 
     <div class="ft-crest ft-crest--hellbourne">
-      <img src={f.hellbourne.crest} alt={`ตรา ${f.hellbourne.name}`} width="96" height="96" loading="lazy" />
+      <img src={f.hellbourne.crest} alt={`${ui.aria.crest} ${f.hellbourne.name}`} width="96" height="96" loading="lazy" />
       <span class="ft-crest-name" style={`color:${f.hellbourne.accent}`}>{f.hellbourne.name}</span>
     </div>
   </div>

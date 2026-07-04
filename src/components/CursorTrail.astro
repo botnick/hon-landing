@@ -3,6 +3,9 @@
 // floating toggle turns it on/off and remembers the choice. Guards: skipped for
 // reduced-motion and coarse-pointer (touch) devices, where a cursor trail makes
 // no sense and just drains battery. The heavy WebGL sim lazy-inits only on enable.
+import { getUi, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const ui = getUi(content);
 ---
 <!-- Full-screen sim canvas (the script paints into this). Hidden until enabled. -->
 <canvas id="fluid" aria-hidden="true"></canvas>
@@ -11,13 +14,13 @@
      gold+spin=on). Tooltip (title) + aria-label carry the meaning without on-screen
      text. Hidden on touch/reduced-motion. -->
 <button id="trail-toggle" type="button" class="trail-toggle" aria-pressed="false"
-        title="เอฟเฟกต์เมาส์" aria-label="เปิด/ปิด เอฟเฟกต์เมาส์">
+        title={ui.aria.cursorFx} aria-label={ui.aria.cursorFxToggle}>
   <span class="trail-glyph" aria-hidden="true">✦</span>
 </button>
 
 <script is:inline src="/js/cursor-trail.js" defer></script>
 
-<script is:inline>
+<script is:inline define:vars={{ onTitle: ui.aria.cursorFxOn, offTitle: ui.aria.cursorFxOff }}>
   (function () {
     var KEY = 'honx-cursor-trail';
     var toggle = document.getElementById('trail-toggle');
@@ -42,7 +45,7 @@
       toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
       toggle.classList.toggle('is-on', on);
       // icon-only: state is conveyed by the glyph styling + tooltip
-      toggle.title = on ? 'เอฟเฟกต์เมาส์ · เปิดอยู่' : 'เอฟเฟกต์เมาส์ · คลิกเพื่อเปิด';
+      toggle.title = on ? onTitle : offTitle;
       // window.CursorTrail is defined by cursor-trail.js; it may load slightly after
       // this inline script, so poll briefly until it's ready.
       function drive() {

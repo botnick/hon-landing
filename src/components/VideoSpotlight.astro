@@ -1,7 +1,8 @@
 ---
-import { getMedia, fallbackContent } from '../lib/content';
+import { getMedia, getUi, fallbackContent } from '../lib/content';
 const { content = fallbackContent } = Astro.props;
 const m = getMedia(content);
+const ui = getUi(content);
 const reel = (m as any).reel;
 const scenes = m.scenes ?? [];
 ---
@@ -58,9 +59,9 @@ const scenes = m.scenes ?? [];
       </div>
 
       {scenes.length > 1 && (
-        <div class="sp-dots" role="tablist" aria-label="เลือกฉาก">
+        <div class="sp-dots" role="tablist" aria-label={ui.aria.sceneTabs}>
           {scenes.map((_, i) => (
-            <button class={`sp-dot${i === 0 ? ' is-active' : ''}`} data-dot={i} type="button" role="tab" aria-label={`ฉากที่ ${i + 1}`} aria-selected={i === 0 ? 'true' : 'false'}></button>
+            <button class={`sp-dot${i === 0 ? ' is-active' : ''}`} data-dot={i} type="button" role="tab" aria-label={`${ui.aria.scene} ${i + 1}`} aria-selected={i === 0 ? 'true' : 'false'}></button>
           ))}
         </div>
       )}

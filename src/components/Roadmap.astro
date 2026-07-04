@@ -1,7 +1,8 @@
 ---
-import { getRoadmap, fallbackContent } from '../lib/content';
+import { getRoadmap, getUi, fallbackContent } from '../lib/content';
 const { content = fallbackContent } = Astro.props;
 const r = getRoadmap(content);
+const ui = getUi(content);
 // Mark each stage relative to the active one: done / active / upcoming.
 const activeIdx = r.stages.findIndex((s) => s.id === r.activeStage);
 const stages = r.stages.map((s, i) => ({
@@ -26,7 +27,7 @@ const stages = r.stages.map((s, i) => ({
           <span class="node-dot" aria-hidden="true"></span>
           <span class="node-label">{s.label}</span>
           <span class="node-note">{s.note}</span>
-          {s.state === 'active' && <span class="node-here">ตอนนี้</span>}
+          {s.state === 'active' && <span class="node-here">{ui.roadmapNow}</span>}
         </li>
       ))}
     </ol>

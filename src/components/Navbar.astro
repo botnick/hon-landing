@@ -1,9 +1,12 @@
 ---
-import { getNav, getContent, fallbackContent } from '../lib/content';
+import { getNav, getContent, getLang, getUi, fallbackContent } from '../lib/content';
 
 const { content = fallbackContent } = Astro.props;
 const site = getContent(content);
 const nav = getNav(content);
+const lang = getLang(content);
+const ui = getUi(content);
+const homeHref = lang === 'en' ? '/en/' : '/';
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 
 const isActive = (href: string) => {
@@ -13,7 +16,7 @@ const isActive = (href: string) => {
 ---
 <header class="nav" id="site-nav">
   <div class="nav-inner wrap">
-    <a class="nav-brand" href="/" aria-label={`${site.brand.name} — หน้าแรก`}>
+    <a class="nav-brand" href={homeHref} aria-label={`${site.brand.name} — ${ui.aria.home}`}>
       <picture>
         {site.brand.logoWebp && <source srcset={site.brand.logoWebp} type="image/webp" />}
         <img src={site.brand.logo} alt={site.brand.name} width="72" height="77" />
@@ -21,7 +24,7 @@ const isActive = (href: string) => {
       <span class="nav-brand-name">{site.brand.name}</span>
     </a>
 
-    <nav class="nav-links" aria-label="เมนูหลัก">
+    <nav class="nav-links" aria-label={ui.aria.mainMenu}>
       {nav.links.map((l) => (
         <a class="nav-link" href={l.href} aria-current={isActive(l.href) ? 'page' : undefined}>
           {l.label}
@@ -38,6 +41,14 @@ const isActive = (href: string) => {
         </svg>
         <span>{nav.member.label}</span>
       </a>
+
+      <!-- Language switch: / = th, /en/ = en. A tiny script keeps the current
+           hash view (#/download…) when hopping between languages. -->
+      <div class="nav-lang" role="group" aria-label={ui.langSwitch}>
+        <a href="/" data-lang-link aria-current={lang === 'th' ? 'true' : undefined} lang="th">TH</a>
+        <span class="nav-lang-sep" aria-hidden="true">/</span>
+        <a href="/en/" data-lang-link aria-current={lang === 'en' ? 'true' : undefined} lang="en">EN</a>
+      </div>
     </nav>
   </div>
 </header>
@@ -51,6 +62,15 @@ const isActive = (href: string) => {
   }
   window.addEventListener('scroll', syncNav, { passive: true });
   syncNav(); // deferred module — DOM is ready when this runs
+
+  // Language hop keeps the current hash view (#/download, #/member, …).
+  document.querySelectorAll<HTMLAnchorElement>('a[data-lang-link]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      if (!location.hash) return; // plain navigation is fine
+      e.preventDefault();
+      location.href = (a.getAttribute('href') || '/') + location.hash;
+    });
+  });
 </script>
 
 <style>
@@ -142,10 +162,27 @@ const isActive = (href: string) => {
     box-shadow: inset 0 0 14px rgba(255,198,0,0.12);
   }
 
+  /* --- Language switch — quiet utility, engraved like the links --- */
+  .nav-lang {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    margin-left: clamp(0.2rem, 1.2vw, 0.7rem);
+    font-family: var(--font-latin); font-weight: 600;
+    font-size: 0.78rem; letter-spacing: 0.1em;
+  }
+  .nav-lang a {
+    color: var(--text-dim);
+    padding: 0.35rem 0.15rem;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .nav-lang a:hover { color: var(--text); }
+  .nav-lang a[aria-current] { color: var(--gold-bright); text-shadow: 0 0 10px rgba(255,198,0,0.35); }
+  .nav-lang-sep { color: var(--brass-soft); }
+
   @media (max-width: 560px) {
     .nav-inner { height: 56px; }
     .nav-brand-name { display: none; }
     .nav-link { font-size: 0.86rem; }
     .nav-member span { font-size: 0.82rem; }
+    .nav-lang { font-size: 0.74rem; }
   }
 </style>

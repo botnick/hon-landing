@@ -1,4 +1,5 @@
 import siteData from '../data/site.json';
+import enOverrides from '../data/site.en.json';
 
 /**
  * Content seam. Every component reads content through here — nothing is hardcoded.
@@ -13,6 +14,7 @@ import siteData from '../data/site.json';
  * Publishing (admin) writes the same shape to KV under `active_version` → `site:v<n>`.
  */
 export type Phase = 'cbt' | 'obt' | 'launch';
+export type Lang = 'th' | 'en';
 
 export interface PhaseContent {
   badge: string;
@@ -68,6 +70,48 @@ export async function resolveContent(locals?: RuntimeLocals): Promise<SiteConten
     locals.__content = fallbackContent;
     return fallbackContent;
   }
+}
+
+/* ---- Localization ------------------------------------------------------------- */
+/*
+ * English is a TEXT overlay, not a second content tree: site.en.json holds only the
+ * translated strings and localizeContent() deep-merges it over whatever resolveContent
+ * returned (bundled or live KV). Hrefs, dates, colors, phase and section toggles are
+ * therefore shared — an admin publish changes both languages at once.
+ */
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** Objects merge per key, arrays merge element-wise (so override entries may be partial). */
+function deepMerge(base: unknown, over: unknown): unknown {
+  if (over === undefined) return base;
+  if (Array.isArray(base) && Array.isArray(over)) {
+    const len = Math.max(base.length, over.length);
+    return Array.from({ length: len }, (_, i) => deepMerge(base[i], over[i]));
+  }
+  if (isPlainObject(base) && isPlainObject(over)) {
+    const out: Record<string, unknown> = { ...base };
+    for (const k of Object.keys(over)) out[k] = deepMerge(base[k], over[k]);
+    return out;
+  }
+  return over;
+}
+
+/** Overlay the requested language's text onto the resolved content. 'th' is the base. */
+export function localizeContent(content: SiteContent, lang: Lang): SiteContent {
+  if (lang !== 'en') return content;
+  return deepMerge(content, enOverrides) as SiteContent;
+}
+
+export function getLang(content: SiteContent = fallbackContent): Lang {
+  return content.lang === 'en' ? 'en' : 'th';
+}
+
+/** Chrome strings (countdown units, aria labels, language switcher). */
+export function getUi(content: SiteContent = fallbackContent) {
+  return content.ui;
 }
 
 /* ---- Sync accessors — default to bundled JSON, or pass in resolved content. ---- */

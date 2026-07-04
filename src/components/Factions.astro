@@ -1,7 +1,8 @@
 ---
-import { getFactions, fallbackContent } from '../lib/content';
+import { getFactions, getUi, fallbackContent } from '../lib/content';
 const { content = fallbackContent } = Astro.props;
 const f = getFactions(content);
+const ui = getUi(content);
 const L = f.legion;
 const H = f.hellbourne;
 // All faction visuals are data-driven (colors/glow/crest/text from site.json) — nothing hardcoded.
@@ -16,7 +17,7 @@ const vars = `--l-accent:${L.accent}; --l-glow:${L.glow}; --h-accent:${H.accent}
       <img class="fc-bg" src={L.crest} alt="" aria-hidden="true" />
       <div class="fc-veil"></div>
       <div class="fc-content">
-        <img class="fc-crest" src={L.crest} alt={`ตราสัญลักษณ์ ${L.name}`} width="120" height="120" loading="lazy" />
+        <img class="fc-crest" src={L.crest} alt={`${ui.aria.crestOf} ${L.name}`} width="120" height="120" loading="lazy" />
         <h3 class="fc-name">{L.name}</h3>
         <p class="fc-tag">{L.tagline}</p>
         <p class="fc-lore">{L.lore}</p>
@@ -27,7 +28,7 @@ const vars = `--l-accent:${L.accent}; --l-glow:${L.glow}; --h-accent:${H.accent}
       <img class="fc-bg" src={H.crest} alt="" aria-hidden="true" />
       <div class="fc-veil"></div>
       <div class="fc-content">
-        <img class="fc-crest" src={H.crest} alt={`ตราสัญลักษณ์ ${H.name}`} width="120" height="120" loading="lazy" />
+        <img class="fc-crest" src={H.crest} alt={`${ui.aria.crestOf} ${H.name}`} width="120" height="120" loading="lazy" />
         <h3 class="fc-name">{H.name}</h3>
         <p class="fc-tag">{H.tagline}</p>
         <p class="fc-lore">{H.lore}</p>
@@ -41,12 +42,12 @@ const vars = `--l-accent:${L.accent}; --l-glow:${L.glow}; --h-accent:${H.accent}
        Container is NOT aria-hidden (it holds focusable buttons — that would trap keyboard
        users on hidden controls); the decorative dots carry aria-hidden instead. -->
   <div class="fc-nav">
-    <button class="fc-arrow fc-arrow--prev" type="button" aria-label="ฝ่ายก่อนหน้า">‹</button>
+    <button class="fc-arrow fc-arrow--prev" type="button" aria-label={ui.aria.prevFaction}>‹</button>
     <div class="fc-dots" aria-hidden="true">
       <span class="fc-dot is-active" data-i="0"></span>
       <span class="fc-dot" data-i="1"></span>
     </div>
-    <button class="fc-arrow fc-arrow--next" type="button" aria-label="ฝ่ายถัดไป">›</button>
+    <button class="fc-arrow fc-arrow--next" type="button" aria-label={ui.aria.nextFaction}>›</button>
   </div>
 </div>
 

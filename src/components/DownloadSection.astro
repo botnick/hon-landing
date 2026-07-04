@@ -1,9 +1,10 @@
 ---
-import { getDownload, getPhaseContent, fallbackContent } from '../lib/content';
+import { getDownload, getPhaseContent, getUi, fallbackContent } from '../lib/content';
 
 const { content = fallbackContent } = Astro.props;
 const d = getDownload(content);
 const phase = getPhaseContent(content);
+const ui = getUi(content);
 
 // The armory unlocks preloadHours BEFORE the hero countdown hits zero (preload
 // window: grab the client early, play the second the gate opens). Both states
@@ -78,7 +79,7 @@ const available = Boolean(d.client.href) && (!opensAt || Date.now() >= downloadA
             <span class="dl-wait-time" id="dl-cd">--:--:--</span>
           </p>
         </div>
-        <script is:inline data-astro-rerun define:vars={{ downloadAtMs, hasHref: Boolean(d.client.href) }}>
+        <script is:inline data-astro-rerun define:vars={{ downloadAtMs, hasHref: Boolean(d.client.href), dayLabel: ui.countdown.day }}>
           // Ticks down to the preload window, then swaps in the live button — so a
           // build shipped in the locked state unseals itself right on time.
           (function () {
@@ -90,7 +91,7 @@ const available = Boolean(d.client.href) && (!opensAt || Date.now() >= downloadA
               var s = Math.max(0, Math.floor(ms / 1000));
               var days = Math.floor(s / 86400);
               var h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-              return (days > 0 ? days + ' วัน ' : '') + pad(h) + ':' + pad(m) + ':' + pad(sec);
+              return (days > 0 ? days + ' ' + dayLabel + ' ' : '') + pad(h) + ':' + pad(m) + ':' + pad(sec);
             }
             var timer = null;
             function tick() {
