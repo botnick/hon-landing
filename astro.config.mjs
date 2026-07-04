@@ -12,6 +12,8 @@ export default defineConfig({
   site: 'https://hon-x.net',
   output: 'hybrid',
   adapter: cloudflare({ imageService: 'passthrough' }),
+  // Single-page teaser is SSR (prerender:false), so @astrojs/sitemap has no static
+  // routes to enumerate — a hand-written public/sitemap.xml (one URL) is used instead.
   integrations: [react()],
   build: {
     inlineStylesheets: 'auto',

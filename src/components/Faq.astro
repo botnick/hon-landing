@@ -1,0 +1,79 @@
+---
+import { getFaq, fallbackContent } from '../lib/content';
+const { content = fallbackContent } = Astro.props;
+const f = getFaq(content);
+---
+<section class="faq" id="faq">
+  <div class="wrap faq-inner">
+    <header class="faq-head">
+      <p class="act-eyebrow">{f.eyebrow}</p>
+      <h2 class="faq-title">{f.title}</h2>
+    </header>
+
+    <!-- Native <details> accordion: closed by default (quiet page, expands on
+         interest), zero JS, keyboard-accessible. A single hairline between rows;
+         a +/− mark instead of a heavy chevron. No glow on open — it just unfolds. -->
+    <div class="faq-list" data-stagger>
+      {f.items.map((it) => (
+        <details class="qa r-item">
+          <summary class="qa-q">
+            <span class="qa-text">{it.q}</span>
+            <span class="qa-mark" aria-hidden="true"></span>
+          </summary>
+          <div class="qa-a"><p>{it.a}</p></div>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .faq { padding-block: var(--section-pad); position: relative; }
+  .faq-inner { max-width: 820px; margin-inline: auto; }
+  .faq-head { max-width: 60ch; margin-bottom: clamp(2.6rem, 6vh, 4rem); }
+  .faq-title { font-size: var(--fs-h2); line-height: var(--lh-head); color: var(--text); letter-spacing: 0.01em; }
+
+  .faq-list { border-top: 1px solid var(--brass-soft); }
+  .qa { border-bottom: 1px solid var(--brass-soft); }
+
+  .qa-q {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 1.2rem;
+    padding-block: clamp(1.3rem, 3.4vw, 1.7rem);
+    color: var(--text-dim);
+    transition: color 200ms var(--ease-out);
+  }
+  .qa-q::-webkit-details-marker { display: none; }
+  .qa-text {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: var(--fs-h3); line-height: 1.35; letter-spacing: 0.01em;
+  }
+  @media (hover: hover) { .qa-q:hover { color: var(--text); } }
+  .qa[open] .qa-q { color: var(--text); }
+
+  /* +/− mark drawn with two hairlines — the vertical one hides when open */
+  .qa-mark { position: relative; width: 15px; height: 15px; flex: 0 0 auto; }
+  .qa-mark::before, .qa-mark::after {
+    content: ''; position: absolute; background: var(--gold-deep);
+    transition: opacity 220ms var(--ease-out), background 200ms var(--ease-out);
+  }
+  .qa-mark::before { top: 7px; left: 0; width: 15px; height: 1.5px; }        /* horizontal */
+  .qa-mark::after  { left: 7px; top: 0; width: 1.5px; height: 15px; }        /* vertical */
+  .qa[open] .qa-mark::after { opacity: 0; }
+  .qa[open] .qa-mark::before { background: var(--gold-bright); }
+
+  .qa-a {
+    color: var(--text-dim);
+    font-size: var(--fs-body); line-height: var(--lh-body);
+    max-width: 62ch;
+    padding-bottom: clamp(1.3rem, 3.4vw, 1.7rem);
+    padding-right: 2.4rem;
+  }
+  .qa-a p { margin: 0; }
+
+  /* reduced-motion: nothing animates on open, which is already the case (no height
+     transition on native details) — but keep the mark swap instant too */
+  @media (prefers-reduced-motion: reduce) {
+    .qa-mark::before, .qa-mark::after { transition: none; }
+  }
+</style>
