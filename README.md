@@ -30,7 +30,17 @@ cross-app plumbing.
 
 ## Develop
 
+**Prerequisites**
+
+- **Node** ≥ 18 and **pnpm** ≥ 8 (`npm i -g pnpm`).
+- A **Cloudflare** account only for *deploy* — local dev needs no login (bindings run
+  against a local `.wrangler/state` D1/KV; `wrangler` ships as a dev dependency).
+
+**Setup**
+
 ```bash
+git clone https://github.com/botnick/hon-landing.git
+cd hon-landing
 pnpm install
 
 # 1. create the local D1 schema (users, sessions, content_versions, audit, app_settings)
@@ -44,10 +54,15 @@ pnpm seed:content
 
 # 4. run the app
 pnpm dev                   # → http://localhost:4330  (landing) · /admin (sign in) · /login
+#   sign in at /login with the email + password from step 2
 
 # tests
 pnpm test                  # contract validator unit tests
 ```
+
+> First run in order: `db:migrate` → `seed-owner` → `seed:content`. Skipping the schema
+> step makes the seeds fail; the app still serves the bundled fallback snapshot, but the
+> admin has no owner to sign in with.
 
 `astro.config.mjs` wires the D1/KV bindings into `astro dev` via `platformProxy`, pointed at
 the **same** `.wrangler/state` dir that `wrangler d1 execute --local` writes to — so the DB
@@ -74,7 +89,8 @@ the env secret `TRANSLATE_API_KEY`.
    ```bash
    pnpm exec wrangler d1 execute hon-x-cms --remote --file=./migrations/0001_init.sql
    pnpm exec wrangler d1 execute hon-x-cms --remote --file=./migrations/0002_app_settings.sql
-   # seed owner: run the INSERT that scripts/seed-owner.mjs prints, against --remote
+   # seed the owner straight into the remote db (D1_REMOTE=1 flips the script to --remote):
+   D1_REMOTE=1 node scripts/seed-owner.mjs admin@hon-x.net 'YourStrongPassword' 'Site Owner'
    ```
 4. **Secrets** (never commit):
    ```bash

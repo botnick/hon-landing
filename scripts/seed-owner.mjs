@@ -1,10 +1,12 @@
 /**
- * Seed the first owner user into local D1.
+ * Seed the first owner user into D1.
  *
- *   node scripts/seed-owner.mjs <email> <password> [name]
+ *   node scripts/seed-owner.mjs <email> <password> [name]     # local (default)
+ *   D1_REMOTE=1 node scripts/seed-owner.mjs <email> <password> [name]   # remote (deploy)
  *
  * Hashes the password with the SAME PBKDF2 scheme the app uses (src/lib/crypto.ts),
- * then emits an idempotent SQL INSERT and pipes it through wrangler d1 --local.
+ * then runs an idempotent SQL INSERT via wrangler d1 execute. Targets the local dev
+ * DB by default; set D1_REMOTE=1 to seed the deployed (remote) database instead.
  * Run once to bootstrap; afterwards manage users from the admin UI.
  */
 import { execFileSync } from 'node:child_process';
@@ -45,8 +47,9 @@ const sql = `INSERT INTO users (id,email,name,role,pass_hash,disabled,created_at
 VALUES ('${id}','${em}','${nm}','owner','${hash}',0,${now},${now})
 ON CONFLICT(email) DO UPDATE SET role='owner', pass_hash='${hash}', disabled=0, updated_at=${now};`;
 
-console.log('Seeding owner:', email);
-execFileSync('npx', ['wrangler', 'd1', 'execute', 'hon-x-cms', '--local', '--command', sql], {
+const target = process.env.D1_REMOTE === '1' ? '--remote' : '--local';
+console.log(`Seeding owner (${target}):`, email);
+execFileSync('npx', ['wrangler', 'd1', 'execute', 'hon-x-cms', target, '--command', sql], {
   stdio: 'inherit',
   cwd: process.cwd(),
 });
